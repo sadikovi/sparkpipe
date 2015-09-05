@@ -20,3 +20,5 @@ assemblyJarName in assembly := "sparkpipe-experimental.jar"
 test in assembly := {}
 
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
+
+parallelExecution in Test := false

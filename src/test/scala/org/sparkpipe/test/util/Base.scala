@@ -1,10 +1,11 @@
-package org.sparkpipe.util
+package org.sparkpipe.test.util
 
 import java.io.File
 
-
-private[util] trait Base {
+private[test] trait Base {
     val RESOLVER = "path-resolver"
+    val / = File.separator
+    val `:` = File.pathSeparator
 
     var path: String = ""
 
@@ -18,19 +19,24 @@ private[util] trait Base {
 
     /** base directory of the project */
     final protected def baseDirectory(): String = {
-        val original = getRawPath().split(File.separator)
+        val original = getRawPath().split(/)
         require(original.length > 4, "Path length is too short (<= 4): " + original.length)
         val base = original.dropRight(4)
-        base.mkString(File.separator)
+        base.mkString(/)
     }
 
     /** main directory of the project (./src/main) */
     final protected def mainDirectory(): String = {
-        baseDirectory() + File.separator + "src" + File.separator + "main"
+        baseDirectory() + / + "src" + / + "main"
     }
 
     /** test directory of the project (./src/test) */
     final protected def testDirectory(): String = {
-        baseDirectory() + File.separator + "src" + File.separator + "test"
+        baseDirectory() + / + "src" + / + "test"
+    }
+
+    /** target directory of the project (./target) */
+    final protected def targetDirectory(): String = {
+        baseDirectory() + / + "target"
     }
 }
