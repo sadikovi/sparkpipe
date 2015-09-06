@@ -7,7 +7,7 @@ import org.apache.spark.{SparkContext, SparkConf}
 import org.sparkpipe.test.util.Base
 
 trait SparkLocalCluster extends SparkLocal with Base {
-    /** loading Spark configuration for local cluster. */
+    /** Loading Spark configuration for local cluster. */
     final protected def localClusterConf(): SparkConf = {
         // OS check
         val system = System.getProperty("os.name").toLowerCase()
@@ -51,8 +51,8 @@ trait SparkLocalCluster extends SparkLocal with Base {
     }
 
     /**
-     * tries loading configuration for local cluster. Can load local mode in case of failure, if
-     * `fallback` options is set to true.
+     * Tries loading configuration for local cluster.
+     * `fallback` option allows to run local mode instead in case of failure.
      */
     private def tryConf(fallback: Boolean = true): SparkConf = Try(localClusterConf()) match {
         case Success(conf) => conf

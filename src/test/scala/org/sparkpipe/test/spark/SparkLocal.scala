@@ -7,7 +7,7 @@ import org.sparkpipe.test.util.UnitTestSpec
 
 /** Spark context with master "local[4]" */
 trait SparkLocal extends SparkBase {
-    /** loading Spark configuration for local mode */
+    /** Loading Spark configuration for local mode */
     final protected def localConf(): SparkConf = {
         new SparkConf().
             setMaster("local[4]").
