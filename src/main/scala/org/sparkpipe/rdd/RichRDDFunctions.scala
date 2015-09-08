@@ -11,7 +11,6 @@ package org.sparkpipe.rdd {
         import scala.io.Codec
         import scala.reflect.ClassTag
         import org.apache.spark.rdd.RDD
-        import org.sparkpipe.rdd.{EncodePipedRDD}
 
         /**
          * :: Experimental ::
