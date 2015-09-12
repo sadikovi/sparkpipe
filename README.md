@@ -1,2 +1,2 @@
 # sparkpipe
-Spark pipe test
+Spark experimental

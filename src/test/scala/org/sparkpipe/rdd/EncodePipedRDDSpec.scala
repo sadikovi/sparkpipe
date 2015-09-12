@@ -1,5 +1,6 @@
 package org.sparkpipe.rdd
 
+import java.io.IOException
 import scala.io.Source
 import org.scalatest._
 import org.sparkpipe.rdd.implicits._
@@ -34,19 +35,19 @@ class EncodePipedRDDSpec extends UnitTestSpec with SparkLocal with BeforeAndAfte
         val c = a.pipeWithEncoding("UTF-8", strict=false)
         c.collect.filter(_.startsWith("[ERROR]")).length should be (1)
 
-        intercept[Exception] {
+        intercept[IOException] {
             a.pipeWithEncoding("UTF-8", strict=true).count
         }
     }
 
     /** test is only for ASCII encoding */
     test("test of malformed input failure during pipe") {
-        val testFile = baseDirectory + / + "sample.log"
+        val testFile = baseDirectory + / + "temp" + / + "sample.log"
         val a = sc.parallelize(Array(testFile)).map("cat " + _)
         val b = a.pipeWithEncoding("ASCII", strict=false)
         b.collect.length should be (Source.fromFile(testFile).getLines().length)
 
-        intercept[Exception] {
+        intercept[IOException] {
             a.pipeWithEncoding("ASCII", strict=true).count
         }
     }

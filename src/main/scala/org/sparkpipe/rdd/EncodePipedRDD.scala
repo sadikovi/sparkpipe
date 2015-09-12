@@ -1,10 +1,11 @@
 package org.sparkpipe.rdd
 
+import java.io.IOException
 import java.nio.charset.CodingErrorAction
 import scala.collection.mutable.ArrayBuffer
 import scala.io.{Source, Codec}
 import scala.reflect.ClassTag
-import scala.sys.process.{Process, ProcessIO}
+import scala.sys.process.{Process, ProcessBuilder, ProcessIO}
 import scala.util.control.NonFatal
 import org.apache.spark.{Partition, TaskContext}
 import org.apache.spark.rdd.RDD
@@ -33,7 +34,7 @@ private[rdd] class EncodePipedRDD[T: ClassTag](
     override def compute(split: Partition, context: TaskContext): Iterator[String] = {
         // rule to apply on incorrect command
         // if true, it will enforce exception, otherwise, it will silence it returning as output
-        val cmdRule = strict
+        val executionRule = strict
         // rule to apply on malformed exception
         val malformedRule = if (strict) CodingErrorAction.REPORT else CodingErrorAction.REPLACE
 
@@ -69,18 +70,98 @@ private[rdd] class EncodePipedRDD[T: ClassTag](
                 }),
                 daemonizeThreads=false
             )
+            // tokenize complex command
+            val cmds = EncodePipedRDD.tokenize(elem.toString)
+            // create buffered process from all the commands
+            var bufferedProcess: ProcessBuilder = Process(cmds.head)
+            cmds.drop(1).foreach(
+                cmd => {
+                    println(cmd)
+                    bufferedProcess = bufferedProcess.#|(Process(cmd))
+                }
+            )
             // execute process, similar to Java's `process.waitFor()`
-            Process(elem.toString).run(logger).exitValue()
+            val exit = bufferedProcess.run(logger).exitValue()
 
             // check for errors and strict rule, if something has happened, return first error
-            if (cmdRule && errbuf.nonEmpty) {
-                throw new Exception("Subprocess exited with 1. " + "Failed for elem: " +
-                    elem.toString + ", reason: " + errbuf.head)
+            if (executionRule && errbuf.nonEmpty) {
+                throw new IOException("Subprocess exited with status " + exit.toString + ". " +
+                    "Failed for elem: " + elem.toString + ", reason: " + errbuf.head)
             }
         }
         // merge two buffers into one. Strategy: if error buffer is empty, return log buffer, else
         // merge them, even if log buffer is empty.
         val merged = if (errbuf.isEmpty) logbuf else logbuf ++ errbuf
         merged.toIterator
+    }
+}
+
+private[rdd] object EncodePipedRDD {
+    /**
+     * Splits command by pipe into several simple commands for processes
+     * e.g. cat temp/sample.log | grep -i "\" | a" will become
+     * Array(cat temp/sample.log, grep -i "\" | a")
+     * Each simple command is an array of tokens, cmd surrounding quotes are removed
+     */
+    def tokenize(cmd: String): ArrayBuffer[Array[String]] = {
+        var isDoubleQuoted = false
+        var isSingleQuoted = false
+        val cmdbuf = ArrayBuffer[Array[String]]()
+        val tmpbuf = new ArrayBuffer[String]()
+        val token = new StringBuilder()
+        var prevchr = '#'
+
+        // whether current state is quoted, so we need to ignore pipe characters
+        def isQuoted(): Boolean = isDoubleQuoted || isSingleQuoted
+
+        // add newly created command from temp buffer
+        // clear temp buffer to prepare for the next
+        def flushCmd() {
+            cmdbuf.append(tmpbuf.toArray)
+            tmpbuf.clear()
+        }
+
+        // add read token to the a current command buffer, and clear the token
+        def flushToken() {
+            tmpbuf.append(token.toString())
+            token.clear()
+        }
+
+        for (chr <- cmd) {
+            if (!isQuoted() && chr == '|') {
+                flushToken()
+                flushCmd()
+            } else if (!isQuoted() && (chr == 9 || chr == 10 || chr == 11 || chr == 12 || chr == 13 ||
+                chr == 32 || chr == 160)) {
+                // if `chr` is a whitespace character we flush token
+                // instead of using scala.runtime.RichChar, we manually compare `chr` to list of Latin
+                // spaces: https://en.wikipedia.org/wiki/Whitespace_character
+                flushToken()
+            } else {
+                if (!isQuoted()) {
+                    if (chr == '"') {
+                        isDoubleQuoted = true
+                    } else if (chr == '\'') {
+                        isSingleQuoted = true
+                    } else {
+                        token.append(chr)
+                    }
+                } else {
+                    if (isSingleQuoted && chr == '\'' && prevchr != '\\') {
+                        isSingleQuoted = false
+                    } else if (isDoubleQuoted && chr == '"' && prevchr != '\\') {
+                        isDoubleQuoted = false
+                    } else {
+                        token.append(chr)
+                    }
+                }
+                prevchr = chr
+            }
+        }
+        // push the last command into cmd buffer
+        flushToken()
+        flushCmd()
+        // and return complete command buffer
+        cmdbuf
     }
 }
