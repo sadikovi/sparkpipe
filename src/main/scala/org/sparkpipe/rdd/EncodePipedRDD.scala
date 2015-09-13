@@ -32,6 +32,20 @@ private[rdd] class EncodePipedRDD[T: ClassTag](
     override def getPartitions: Array[Partition] = firstParent[T].partitions
 
     override def compute(split: Partition, context: TaskContext): Iterator[String] = {
+        // set warning if `file.encoding` and `sun.jnu.encoding` properties do not match specified
+        // encoding, also display how to resolve problem.
+        val fileEncodingProp = Option(System.getProperty("file.encoding"))
+        val sunJnuEncodingProp = Option(System.getProperty("sun.jnu.encoding"))
+        if (!fileEncodingProp.isDefined || !sunJnuEncodingProp.isDefined ||
+            !fileEncodingProp.get.equals(encoding) || !sunJnuEncodingProp.get.equals(encoding)) {
+            logWarning("System encoding is different from " + encoding + ". Even encoding will " +
+                "be applied, driver program may display different result. It is recommended to " +
+                "set configuration options 'spark.driver.extraJavaOptions' and/or " +
+                "'spark.executor.extraJavaOptions' to be '-Dfile.encoding=YOUR_VALUE " +
+                "-Dsun.jnu.encoding=YOUR_VALUE'"
+            )
+        }
+
         // rule to apply on incorrect command
         // if true, it will enforce exception, otherwise, it will silence it returning as output
         val executionRule = strict
@@ -115,9 +129,10 @@ private[rdd] object EncodePipedRDD {
         def isQuoted(): Boolean = isDoubleQuoted || isSingleQuoted
 
         // add newly created command from temp buffer
+        // remove all empty strings from sequence
         // clear temp buffer to prepare for the next
         def flushCmd() {
-            cmdbuf.append(tmpbuf.toArray)
+            cmdbuf.append(tmpbuf.filter(_.nonEmpty).toArray)
             tmpbuf.clear()
         }
 
@@ -131,11 +146,11 @@ private[rdd] object EncodePipedRDD {
             if (!isQuoted() && chr == '|') {
                 flushToken()
                 flushCmd()
-            } else if (!isQuoted() && (chr == 9 || chr == 10 || chr == 11 || chr == 12 || chr == 13 ||
-                chr == 32 || chr == 160)) {
+            } else if (!isQuoted() && (chr == 9 || chr == 10 || chr == 11 || chr == 12 ||
+                chr == 13 || chr == 32 || chr == 160)) {
                 // if `chr` is a whitespace character we flush token
-                // instead of using scala.runtime.RichChar, we manually compare `chr` to list of Latin
-                // spaces: https://en.wikipedia.org/wiki/Whitespace_character
+                // instead of using scala.runtime.RichChar, we manually compare `chr` to list of
+                // Latin spaces: https://en.wikipedia.org/wiki/Whitespace_character
                 flushToken()
             } else {
                 if (!isQuoted()) {

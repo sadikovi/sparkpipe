@@ -1,0 +1,2 @@
+2015-04-30 18:25:58 26 172.117.27.74 㝤㔵㠱 - authentication_failed DENIED "Technology/Internet" -  407 TCP_DENIED CONNECT - tcp softwareupdate.vmware.com 443 / - - "vmware-player-windows/3.1.6 (CDS 1.0; Windows 6.1)" 10.97.216.133 220 401 - "none" "none"
+2015-03-02 13:25:44 1 144.131.10.94 - - authentication_failed DENIED "UnRestricted;Internet Telephony;Chat (IM)/SMS" -  407 TCP_DENIED GET - http ui.skype.com 80 /ui/0/6.14.59.104./en/getlatestversion ?ver=6.14.59.104&uhash=153f38c9c4b887b6859b739199885dbb3 - "Skype� 6.14" 10.97.216.133 1152 249 - "none" "none"

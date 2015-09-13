@@ -1,0 +1,10 @@
+指事字 zhǐshìzì
+Also called simple indicatives, this small category contains characters that are direct iconic
+illustrations. Examples include 上 shàng "up" and 下 xià "down", originally a dot above and below a
+line.
+Compound ideograms[edit] | sample bash check
+会意字 / 會意字 huìyìzì
+Also translated as logical aggregates or associative compounds, these characters have been
+interpreted as combining two or more pictographic or ideographic characters to suggest a third
+meaning. Commonly cited examples include 休 "rest" (composed of the pictograms 人 "person" and 木
+"tree") and 好 "good" (composed of 女 "woman" and 子 "child").

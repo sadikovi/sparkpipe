@@ -1,6 +1,5 @@
 package org.sparkpipe.rdd
 
-import java.io.IOException
 import scala.io.Source
 import org.scalatest._
 import org.sparkpipe.rdd.implicits._
@@ -35,20 +34,51 @@ class EncodePipedRDDSpec extends UnitTestSpec with SparkLocal with BeforeAndAfte
         val c = a.pipeWithEncoding("UTF-8", strict=false)
         c.collect.filter(_.startsWith("[ERROR]")).length should be (1)
 
-        intercept[IOException] {
+        intercept[Exception] {
             a.pipeWithEncoding("UTF-8", strict=true).count
         }
     }
 
     /** test is only for ASCII encoding */
     test("test of malformed input failure during pipe") {
-        val testFile = baseDirectory + / + "temp" + / + "sample.log"
+        val testFile = testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / + "rdd" +
+            / + "sample.txt"
         val a = sc.parallelize(Array(testFile)).map("cat " + _)
         val b = a.pipeWithEncoding("ASCII", strict=false)
         b.collect.length should be (Source.fromFile(testFile).getLines().length)
 
-        intercept[IOException] {
+        intercept[Exception] {
             a.pipeWithEncoding("ASCII", strict=true).count
         }
+    }
+
+    /** test of complex / piped commands */
+    test("complex commands test") {
+        val testFile = testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / + "rdd" +
+            / + "sample.txt"
+        val a = sc.parallelize(Array(testFile)).
+            map("cat " + _ + " | " + "grep -i \"as\"" + " | " + "perl -ne 'print $_'")
+        val b = a.pipeWithEncoding("UTF-8", strict=false)
+        val lines = b.collect
+        lines.length should be (3)
+        lines.sortWith(_ < _) should be (Array(
+            "Also translated as logical aggregates or associative compounds, these characters have been",
+            "Compound ideograms[edit] | sample bash check",
+            "interpreted as combining two or more pictographic or ideographic characters to suggest a third"
+        ))
+    }
+
+    /** test of log sample */
+    test("test of a log sample") {
+        val testFile = testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / + "rdd" +
+            / + "sample-log.txt"
+        val a = sc.parallelize(Array(testFile)).
+            map("cat " + _ + " | " + "grep DENIED" + " | " + "perl -ne 'print $_'")
+        val b = a.pipeWithEncoding("UTF-8", strict=false)
+        val lines = b.collect
+        lines.length should be (2)
+        lines.foreach(
+            line => line.contains("10.97.216.133")
+        )
     }
 }
