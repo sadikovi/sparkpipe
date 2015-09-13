@@ -15,6 +15,8 @@ scalacOptions in (Compile, doc) ++= Seq(
     "-groups", "-implicits", "-deprecation", "-unchecked"
 )
 
+parallelExecution in Test := false
+
 // assembly settings
 assemblyJarName in assembly := "sparkpipe-experimental.jar"
 
@@ -22,4 +24,11 @@ test in assembly := {}
 
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
 
-parallelExecution in Test := false
+assemblyMergeStrategy in assembly := {
+    case "META-INF/MANIFEST.MF" => MergeStrategy.first
+    case PathList(ps @ _*) if ps.last endsWith "pom.xml" => MergeStrategy.first
+    case PathList(ps @ _*) if ps.last endsWith "pom.properties" => MergeStrategy.first
+    case x =>
+        val oldStrategy = (assemblyMergeStrategy in assembly).value
+        oldStrategy(x)
+}
