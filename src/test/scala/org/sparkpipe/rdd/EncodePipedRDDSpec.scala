@@ -81,4 +81,12 @@ class EncodePipedRDDSpec extends UnitTestSpec with SparkLocal with BeforeAndAfte
             line => line.contains("10.97.216.133")
         )
     }
+
+    test("empty commands test") {
+        val a = sc.parallelize(Array("", ""))
+        val b = a.pipeWithEncoding()
+        intercept[Exception] {
+            b.count
+        }
+    }
 }

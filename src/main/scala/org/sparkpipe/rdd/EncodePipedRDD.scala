@@ -84,16 +84,18 @@ private[rdd] class EncodePipedRDD[T: ClassTag](
                 }),
                 daemonizeThreads=false
             )
-            // tokenize complex command
+            // tokenize complex command, use resulting buffer as iterator
             val cmds = EncodePipedRDD.tokenize(elem.toString)
             // create buffered process from all the commands
-            var bufferedProcess: ProcessBuilder = Process(cmds.head)
-            cmds.drop(1).foreach(
-                cmd => {
-                    println(cmd)
+            var bufferedProcess: ProcessBuilder = null
+            cmds.foreach(cmd => {
+                require(cmd.nonEmpty, "Tokenizer returned empty command from " + elem.toString)
+                if (bufferedProcess == null) {
+                    bufferedProcess = Process(cmd)
+                } else {
                     bufferedProcess = bufferedProcess.#|(Process(cmd))
                 }
-            )
+            })
             // execute process, similar to Java's `process.waitFor()`
             val exit = bufferedProcess.run(logger).exitValue()
 
