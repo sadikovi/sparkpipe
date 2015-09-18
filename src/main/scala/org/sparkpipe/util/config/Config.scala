@@ -214,7 +214,10 @@ object Config {
      * @param mode parsing rule for duplicates, default is override
      * @return loaded configuration
      */
-    def fromStream(stream: InputStream, mode: DuplicateMode.Value=DuplicateMode.Override): Config = {
+    def fromStream(
+        stream: InputStream,
+        mode: DuplicateMode.Value=DuplicateMode.Override
+    ): Config = {
         val iter = Source.fromInputStream(stream).getLines()
         new Config(iter, mode)
     }

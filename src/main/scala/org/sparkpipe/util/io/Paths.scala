@@ -17,7 +17,7 @@ private[io] trait Pattern {
      * Matches entire string.
      * @return pattern as string
      */
-    def LocalPattern: String = "^" + LOCAL_DIR + "$"
+    def localPattern: String = "^" + LOCAL_DIR + "$"
 
 
     /**
@@ -25,21 +25,21 @@ private[io] trait Pattern {
      * Matches entire string.
      * @return pattern as string
      */
-    def AbsolutePattern: String = "^" + ABSOLUTE_DIR + "$"
+    def absolutePattern: String = "^" + ABSOLUTE_DIR + "$"
 
 
     /**
      * Local URI pattern. URI + local directory.
      * @return pattern as string
      */
-    def LocalUriPattern: String
+    def localUriPattern: String
 
 
     /**
      * Absolute URI pattern. URI + absolute directory.
      * @return pattern as string
      */
-    def AbsoluteUriPattern: String
+    def absoluteUriPattern: String
 }
 
 /** Path class to provide general interface */
@@ -86,17 +86,17 @@ class LocalPath(private val filepath: String) extends Path with Pattern {
 
     // cleaned path
     private val path = filepath.stripSuffix("/") match {
-        case a if LocalPattern.r.findFirstMatchIn(a).nonEmpty =>
-            LocalPattern.r.findFirstMatchIn(a).get.group(0)
+        case a if localPattern.r.findFirstMatchIn(a).nonEmpty =>
+            localPattern.r.findFirstMatchIn(a).get.group(0)
 
-        case b if AbsolutePattern.r.findFirstMatchIn(b).nonEmpty =>
-            AbsolutePattern.r.findFirstMatchIn(b).get.group(0)
+        case b if absolutePattern.r.findFirstMatchIn(b).nonEmpty =>
+            absolutePattern.r.findFirstMatchIn(b).get.group(0)
 
-        case c if LocalUriPattern.r.findFirstMatchIn(c).nonEmpty =>
-            LocalUriPattern.r.findFirstMatchIn(c).get.group(1)
+        case c if localUriPattern.r.findFirstMatchIn(c).nonEmpty =>
+            localUriPattern.r.findFirstMatchIn(c).get.group(1)
 
-        case d if AbsoluteUriPattern.r.findFirstMatchIn(d).nonEmpty =>
-            AbsoluteUriPattern.r.findFirstMatchIn(d).get.group(1)
+        case d if absoluteUriPattern.r.findFirstMatchIn(d).nonEmpty =>
+            absoluteUriPattern.r.findFirstMatchIn(d).get.group(1)
 
         case _ => throw new IllegalArgumentException(s"Path $filepath is not a FS path")
     }
@@ -108,14 +108,14 @@ class LocalPath(private val filepath: String) extends Path with Pattern {
      * Local URI pattern.
      * @return pattern as string
      */
-    def LocalUriPattern: String =
+    def localUriPattern: String =
         "^" + """file:\/\/""" + "(" + this.LOCAL_DIR + ")" + "$"
 
     /**
      * Absolute URI pattern.
      * @return pattern as string
      */
-    def AbsoluteUriPattern: String =
+    def absoluteUriPattern: String =
         "^" + """file:\/\/""" + "(" + this.ABSOLUTE_DIR + ")" + "$"
 
     /**
@@ -158,23 +158,24 @@ class HadoopPath(private val filepath: String) extends Path with Pattern {
 
     // host and port to identify HDFS and absolute file path
     private val (host, port, path) = filepath.stripSuffix("/") match {
-        case a if AbsoluteUriPattern.r.findFirstMatchIn(a).nonEmpty =>
-            val matched = AbsoluteUriPattern.r.findFirstMatchIn(a).get
+        case a if absoluteUriPattern.r.findFirstMatchIn(a).nonEmpty =>
+            val matched = absoluteUriPattern.r.findFirstMatchIn(a).get
             (matched.group(1), matched.group(2), matched.group(3))
 
         case _ => throw new IllegalArgumentException(s"Path $filepath is not Hadoop FS path")
     }
 
     /** Local URI pattern. Not supported for HDFS. */
-    def LocalUriPattern: String =
+    def localUriPattern: String =
         throw new UnsupportedOperationException("Local URI is not supported")
 
     /**
      * Absolute URI pattern. Parses host, port and filepath.
      * @return pattern as string
      */
-    def AbsoluteUriPattern: String =
-        "^" + """hdfs:\/\/""" + """([\w\.-]+)""" + ":" + """([\d]{2,8})""" + "(" + this.ABSOLUTE_DIR + ")" + "$"
+    def absoluteUriPattern: String =
+        "^" + """hdfs:\/\/""" + """([\w\.-]+)""" + ":" + """([\d]{2,8})""" +
+        "(" + this.ABSOLUTE_DIR + ")" + "$"
 
     /**
      * Tests whether file system is local. For Hadoop Path returns false.

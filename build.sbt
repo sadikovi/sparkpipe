@@ -1,7 +1,5 @@
 name := "sparkpipe-experimental"
 
-version := "0.1.0"
-
 scalaVersion := "2.10.4"
 
 libraryDependencies ++= Seq(
@@ -25,7 +23,8 @@ test in assembly := {}
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
 
 assemblyMergeStrategy in assembly := {
-    case "META-INF/MANIFEST.MF" => MergeStrategy.first
+    case m if m.toLowerCase.endsWith("manifest.mf") => MergeStrategy.discard
+    case m if m.toLowerCase.matches("meta-inf.*\\.sf$") => MergeStrategy.discard
     case PathList(ps @ _*) if ps.last endsWith "pom.xml" => MergeStrategy.first
     case PathList(ps @ _*) if ps.last endsWith "pom.properties" => MergeStrategy.first
     case x =>
