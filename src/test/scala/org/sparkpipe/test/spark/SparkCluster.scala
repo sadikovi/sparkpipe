@@ -22,11 +22,11 @@ trait SparkCluster extends SparkLocal with Base {
             )
         }
 
-        // throw exception if SPARK_MASTER_URL is not set
-        val SPARK_MASTER_URL = Option(System.getenv("SPARK_MASTER_URL")) match {
+        // throw exception if SPARK_MASTER_ADDRESS is not set
+        val SPARK_MASTER_ADDRESS = Option(System.getenv("SPARK_MASTER_ADDRESS")) match {
             case Some(opt) => opt
             case None => throw new UnsupportedOperationException(
-                "Spark Cluster mode requires SPARK_MASTER_URL to be set"
+                "Spark Cluster mode requires SPARK_MASTER_ADDRESS to be set"
             )
         }
 
@@ -49,8 +49,8 @@ trait SparkCluster extends SparkLocal with Base {
         ).mkString(`:`)
 
         new SparkConf().
-           setMaster(SPARK_MASTER_URL).
-           setAppName("spark-local-cluster-test").
+           setMaster(SPARK_MASTER_ADDRESS).
+           setAppName("spark-cluster-test").
            set("spark.driver.memory", "1g").
            set("spark.executor.memory", "1g").
            set("spark.executorEnv.SPARK_HOME", SPARK_HOME).
