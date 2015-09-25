@@ -11,7 +11,30 @@ package org.sparkpipe.rdd
 package object implicits {
     import scala.io.Codec
     import scala.reflect.ClassTag
+    import org.apache.spark.SparkContext
     import org.apache.spark.rdd.RDD
+
+    /**
+     * :: Experimental ::
+     * RichSparkContextFunctions class provides some additional functionality to RDDs.
+     * All methods can be called on SparkContext similar to standard methods,
+     * such as `sc.textFile`.
+     */
+    implicit class RichSparkContextFunctions(sc: SparkContext) {
+        /** Resolves local or HDFS file patterns and returns list with file paths */
+        def fileName(files: Array[String], numSlices: Int): FilenameCollectionRDD[String] = {
+            new FilenameCollectionRDD[String](sc, files, numSlices)
+        }
+
+        /** filename RDD with default number of partitions */
+        def fileName(files: Array[String]): FilenameCollectionRDD[String] = {
+            fileName(files, sc.defaultMinPartitions)
+        }
+
+        /** convinience method to specify paths as arguments */
+        def fileName(files: String*): FilenameCollectionRDD[String] =
+            fileName(files.toArray)
+    }
 
     /**
      * :: Experimental ::
