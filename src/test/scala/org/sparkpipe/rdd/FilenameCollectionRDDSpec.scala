@@ -47,6 +47,13 @@ class FilenameCollectionRDDSpec extends UnitTestSpec with SparkLocal with Before
         files.isEmpty should be (true)
     }
 
+    // test of non-existent file (issue #3)
+    test("test of non-existent file path") {
+        val rdd = sc.fileName("/test/wrong/file/path.some")
+        val files = rdd.collect()
+        files.isEmpty should be (true)
+    }
+
     // empty file pattern should throw exception, as HDFS Path class will fail
     test("test of empty file pattern") {
         val rdd = sc.fileName("")

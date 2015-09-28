@@ -54,9 +54,12 @@ private[rdd] class FilenameCollectionRDD[T<:String: ClassTag] (
             require(path.isAbsolute, "Absolute path is required, got " + elem)
 
             val fs = path.getFileSystem(new JobConf())
-            val statuses = fs.globStatus(path)
-            // return list of files
-            statuses.map(status => status.getPath().toString)
+            // check if statuses fs.globStatus returns null (issue #3)
+            val statuses = Option(fs.globStatus(path))
+            statuses match {
+                case Some(arr) => arr.map(status => status.getPath().toString)
+                case None => Array[String]()
+            }
         }
         paths.flatMap(list => list).toIterator
     }

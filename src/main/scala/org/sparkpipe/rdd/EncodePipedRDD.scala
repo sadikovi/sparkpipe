@@ -67,20 +67,26 @@ private[rdd] class EncodePipedRDD[T: ClassTag](
                     // need to catch it and push to the error buffer
                     // use `toString` to fetch type of exception
                     try {
-                        Source.fromInputStream(output)(codec).getLines().foreach(
-                            line => logbuf.append(line)
+                        Source.fromInputStream(output)(codec).getLines().foreach(line =>
+                            logbuf.append(line)
                         )
                     } catch {
                         case NonFatal(e) => errbuf.append("[ERROR] " + e.toString())
+                    } finally {
+                        output.close()
                     }
                 }),
                 (err => {
                     // we apply UTF-8 encoding and REPLACE malformed rule for error, as it is a
                     // general case, and we have to return error without generating another
                     // exception.
-                    Source.fromInputStream(err)(errCodec).getLines().foreach(
-                        errline => errbuf.append("[ERROR] " + errline)
-                    )
+                    try {
+                        Source.fromInputStream(err)(errCodec).getLines().foreach(errline =>
+                            errbuf.append("[ERROR] " + errline)
+                        )
+                    } finally {
+                        err.close()
+                    }
                 }),
                 daemonizeThreads=false
             )
