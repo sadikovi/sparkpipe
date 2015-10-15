@@ -35,6 +35,16 @@ class ConfigSpec extends UnitTestSpec {
         conf.getString("goal", "default") should be (Some("be on the Moon"))
     }
 
+    test("Config should read key-space keys properly") {
+        val dir = good
+        val conf = Config.fromPath(dir)
+
+        conf.getBoolean("spark.shuffle.spill", "key-space") should be (Some(true))
+        conf.getBoolean("spark.file.overwrite", "key-space") should be (Some(false))
+        conf.getString("spark.driver.extraJavaOptions", "key-space") should be (
+            Some("-Dfile.encoding=UTF-8"))
+    }
+
     test("Duplicate mode test") {
         val dir = good
         val overriden = Config.fromPath(dir, DuplicateMode.Override)
@@ -46,5 +56,23 @@ class ConfigSpec extends UnitTestSpec {
         intercept[Exception] {
             val thrown = Config.fromPath(dir, DuplicateMode.Throw)
         }
+    }
+
+    test("Config should replace property if value is not defined") {
+        val dir = good
+        val conf = Config.fromPath(dir)
+
+        conf.getStringOrElse("key", "default") should be ("value")
+        conf.getStringOrElse("another", "default") should be ("another day in Paradise")
+        conf.getBooleanOrElse("boolean", "booleans", true) should be (false)
+        conf.getIntOrElse("int", "numbers", -1) should be (1)
+        conf.getDoubleOrElse("double", "numbers", -1.0) should be (23.8)
+        // unknown properties
+        conf.getStringOrElse("another-string-property", "-1.0") should be ("-1.0")
+        conf.getIntOrElse("another-int-property", -1) should be (-1)
+        conf.getLongOrElse("another-long-property", -1L) should be (-1L)
+        conf.getDoubleOrElse("another-double-property", -1.0) should be (-1.0)
+        // key-space properties
+        conf.getIntOrElse("spark.sql.partitions", 100) should be (100)
     }
 }

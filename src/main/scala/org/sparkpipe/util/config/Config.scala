@@ -22,7 +22,7 @@ private[config] class Config(private val iter: Iterator[String], val mode: Dupli
     // Configuration also checks for a valid file lines and will throw exception if file contains
     // lines that cannot be parsed as section / key-value / comment / new line
     private val SECTION_PATTERN = """^\s*\[([\w-]+)\]\s*$""".r("section")
-    private val KEYVALUE_PATTERN = """^([\w-]+)\s*=\s*([^"\s]*|"[^\r\n]*")$""".r("key", "value")
+    private val KEYVALUE_PATTERN = """^([\w-\.]+)\s*=\s*([^"\s]*|"[^\r\n]*")$""".r("key", "value")
     private val COMMENT_PATTERN = """^#.*""".r
     private val NEWLINE_PATTERN = """^\s*$""".r
 
@@ -90,7 +90,7 @@ private[config] class Config(private val iter: Iterator[String], val mode: Dupli
      * @param mode enforcing rule to store key-value
      * @return updated pairs map
      */
-    private def storeKeyInMap(
+    private[config] def storeKeyInMap(
         map: Map[String, String],
         key: String,
         section: String,
@@ -157,7 +157,7 @@ private[config] class Config(private val iter: Iterator[String], val mode: Dupli
      * @param func conversion function
      * @return option of type T
      */
-    private def getSome[T](
+    private[config] def getSome[T](
         key: String,
         section: String,
         func: String => T
@@ -167,6 +167,8 @@ private[config] class Config(private val iter: Iterator[String], val mode: Dupli
     }
 
     // API
+    // defined for some general types, to define more complex data types, subclass this class.
+
     /** true, if configuration could not find any key-value pairs */
     def isEmpty: Boolean = pairs.isEmpty
 
@@ -176,11 +178,49 @@ private[config] class Config(private val iter: Iterator[String], val mode: Dupli
     def getInt(key: String, section: String = defaultSection): Option[Int] =
         getSome(key, section, _.toInt)
 
+    def getLong(key: String, section: String = defaultSection): Option[Long] =
+        getSome(key, section, _.toLong)
+
     def getDouble(key: String, section: String = defaultSection): Option[Double] =
         getSome(key, section, _.toDouble)
 
     def getBoolean(key: String, section: String = defaultSection): Option[Boolean] =
         getSome(key, section, _.toBoolean)
+
+    /** get String value or replace with default */
+    def getStringOrElse(key: String, section: String, default: String): String =
+        getString(key, section).getOrElse(default)
+
+    def getStringOrElse(key: String, default: String): String =
+        getString(key, defaultSection).getOrElse(default)
+
+    /** get Int value or replace with default */
+    def getIntOrElse(key: String, section: String, default: Int): Int =
+        getInt(key, section).getOrElse(default)
+
+    def getIntOrElse(key: String, default: Int): Int =
+        getIntOrElse(key, defaultSection, default)
+
+    /** get Long value or replace with default */
+    def getLongOrElse(key: String, section: String, default: Long): Long =
+        getLong(key, section).getOrElse(default)
+
+    def getLongOrElse(key: String, default: Long): Long =
+        getLongOrElse(key, defaultSection, default)
+
+    /** get Double value or replace with default */
+    def getDoubleOrElse(key: String, section: String, default: Double): Double =
+        getDouble(key, section).getOrElse(default)
+
+    def getDoubleOrElse(key: String, default: Double): Double =
+        getDoubleOrElse(key, defaultSection, default)
+
+    /** get Boolean value or replace with default */
+    def getBooleanOrElse(key: String, section: String, default: Boolean): Boolean =
+        getBoolean(key, section).getOrElse(default)
+
+    def getBooleanOrElse(key: String, default: Boolean): Boolean =
+        getBooleanOrElse(key, defaultSection, default)
 }
 
 /** Configuration factory */
