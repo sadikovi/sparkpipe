@@ -31,14 +31,14 @@ import org.apache.hadoop.fs.{FileSystem, FileStatus, Path, PathFilter, FileUtil}
  * +- slave
  *    +- slave-log.gz
  * {{{
- * val filePattern = "/data/*/*/*.gz"
+ * val filePattern = "/data/ * / * / *.gz"
  * val rdd = sc.fileName(filePattern)
  * // this will return
  * // /data/master/logs/log1.gz
  * // /data/master/temp/log2.gz
  *
  * // though using globstar...
- * val filePattern = "/data/**/*.gz"
+ * val filePattern = "/data/ ** / *.gz"
  * val rdd = sc.fileName(filePattern)
  * // it will return
  * // /data/master/logs/log1.gz
