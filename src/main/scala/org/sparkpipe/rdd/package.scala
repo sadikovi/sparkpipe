@@ -21,18 +21,33 @@ package object implicits {
      * such as `sc.textFile`.
      */
     implicit class RichSparkContextFunctions(sc: SparkContext) {
-        /** Resolves local or HDFS file patterns and returns list with file paths */
-        def fileName(files: Array[String], numSlices: Int): FilenameCollectionRDD[String] = {
-            new FilenameCollectionRDD[String](sc, files, numSlices)
+        /**
+         * Resolves local or HDFS file patterns and returns list with file paths.
+         * `numSlices` is a number of partitions to use for file patterns, not results.
+         * `splitPerFile` allows to store each resolved file path to be in its own partition. Very
+         * useful, if using with PipedRDD chains.
+         */
+        def fileName(
+            files: Array[String],
+            numSlices: Int,
+            splitPerFile: Boolean = true
+        ): RDD[String] = {
+            val rdd = new FilenameCollectionRDD[String](sc, files, numSlices)
+            if (!splitPerFile) {
+                return rdd
+            }
+            // cache RDD and repartition by number of files
+            val numFiles = rdd.cache().count.toInt
+            if (numFiles > 0) rdd.repartition(numFiles) else rdd
         }
 
         /** filename RDD with default number of partitions */
-        def fileName(files: Array[String]): FilenameCollectionRDD[String] = {
-            fileName(files, sc.defaultMinPartitions)
+        def fileName(files: Array[String]): RDD[String] = {
+            fileName(files, sc.defaultMinPartitions, true)
         }
 
         /** convinience method to specify paths as arguments */
-        def fileName(files: String*): FilenameCollectionRDD[String] =
+        def fileName(files: String*): RDD[String] =
             fileName(files.toArray)
     }
 

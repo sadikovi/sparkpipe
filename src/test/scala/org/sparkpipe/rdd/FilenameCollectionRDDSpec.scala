@@ -6,6 +6,11 @@ import org.sparkpipe.test.spark.SparkLocal
 import org.sparkpipe.test.util.UnitTestSpec
 
 class FilenameCollectionRDDSpec extends UnitTestSpec with SparkLocal with BeforeAndAfterAll {
+    val textFilePattern = testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / +
+        "rdd" + / + "*.txt"
+    val configFilePattern = testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / +
+        "util" + / + "config" + / + "*.conf"
+
     override def beforeAll(configMap: ConfigMap) {
         startSparkContext()
     }
@@ -15,11 +20,6 @@ class FilenameCollectionRDDSpec extends UnitTestSpec with SparkLocal with Before
     }
 
     test("test to return associated files for local file pattern") {
-        val textFilePattern = testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / +
-            "rdd" + / + "*.txt"
-        val configFilePattern = testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / +
-            "util" + / + "config" + / + "*.conf"
-
         val rdd = sc.fileName(Array(textFilePattern, configFilePattern), numSlices=2)
         val files = rdd.collect()
 
@@ -56,17 +56,37 @@ class FilenameCollectionRDDSpec extends UnitTestSpec with SparkLocal with Before
 
     // empty file pattern should throw exception, as HDFS Path class will fail
     test("test of empty file pattern") {
-        val rdd = sc.fileName("")
         intercept[Exception] {
+            val rdd = sc.fileName("")
             rdd.collect()
         }
     }
 
-    // testing of exception thrown, should catch SparkException instead of general Exception
+    // testing of non-absolute path, rdd should convert local path into absolute by default
     test("test of non-absolute file path") {
         val rdd = sc.fileName("test/local/file.path")
-        intercept[Exception] {
-            rdd.collect()
-        }
+        // should return empty sequence without failing
+        rdd.collect().isEmpty should be (true)
+    }
+
+    // issue #8 test
+    test("test splitPerFile option") {
+        val rdd = sc.fileName(Array(textFilePattern), 4, false)
+        rdd.partitions.length should be (4)
+        val splitRdd = sc.fileName(Array(textFilePattern), 4, true)
+        splitRdd.partitions.length should be (2)
+    }
+
+    // testing simple globstar functionality in local file system
+    test("test of globstar functionality") {
+        val rdd = sc.fileName(Array(textFilePattern, configFilePattern))
+        val files = rdd.collect()
+        // using globstar to fetch those files
+        val globRdd = sc.fileName(testDirectory + / + "resources" + / + "org" + / + "sparkpipe" +
+            / + "**" + / + "*.(txt|conf)"
+        )
+        val globFiles = globRdd.collect()
+        globFiles.length should equal (files.length)
+        globFiles.sortWith(_ < _) should equal (files.sortWith(_ < _))
     }
 }
