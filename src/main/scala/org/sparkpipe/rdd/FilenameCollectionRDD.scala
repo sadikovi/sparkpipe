@@ -31,14 +31,14 @@ import org.apache.hadoop.fs.{FileSystem, FileStatus, Path, PathFilter, FileUtil}
  * +- slave
  *    +- slave-log.gz
  * {{{
- * val filePattern = "/data/ * / * / *.gz"
+ * val filePattern = "/ data / * / * / *.gz"
  * val rdd = sc.fileName(filePattern)
  * // this will return
  * // /data/master/logs/log1.gz
  * // /data/master/temp/log2.gz
  *
  * // though using globstar...
- * val filePattern = "/data/ ** / *.gz"
+ * val filePattern = "/ data / ** / *.gz"
  * val rdd = sc.fileName(filePattern)
  * // it will return
  * // /data/master/logs/log1.gz
@@ -51,14 +51,14 @@ import org.apache.hadoop.fs.{FileSystem, FileStatus, Path, PathFilter, FileUtil}
 private[rdd] class PathSuffixFilter(private val regex: String) extends PathFilter {
     private val expected: Array[String] = regex.split(Path.SEPARATOR).map(x => convertToRegex(x))
 
-    private def convertToRegex(str: String, close: Boolean = true): String = {
+    private def convertToRegex(str: String, matchExactly: Boolean = true): String = {
         // escape original [.^$] with \symbol
         val escapedStr = str.replaceAllLiterally(".", "\\.").replaceAllLiterally("^", "\\^").
         replaceAllLiterally("$", "\\$")
         //now replace all occuriences of [*] on [.*]
         val pattern = escapedStr.replaceAllLiterally("*", ".*")
         // return final pattern, close regex if you want to match exactly (recommended)
-        if (close) "^" + pattern + "$" else pattern
+        if (matchExactly) "^" + pattern + "$" else pattern
     }
 
     def deny(path: Path): Boolean = !accept(path)
@@ -100,8 +100,8 @@ private[rdd] class FilenameCollectionPartition[T: ClassTag] (
  * patterns as strings. Supports normal parsing mode, and mode with a globstar to search
  * recursively, similar to `find /.../.../ -name -type f`. Globstar should be used once in file
  * pattern, if pattern has more than one occurience of "**", then the first one is considered valid
- * and the rest is a part of suffix string that will be matched literally. HDFS and local file
- * system both support globstar.
+ * and the rest is a part of suffix string that will be matched literally. FilenameCollectionRDD
+ * supports file patterns with globstar for both HDFS and local file systems.
  */
 private[rdd] class FilenameCollectionRDD[T<:String: ClassTag] (
     @transient sc: SparkContext,
@@ -126,22 +126,28 @@ private[rdd] class FilenameCollectionRDD[T<:String: ClassTag] (
                 workDir.suffix(Path.SEPARATOR + path.toString())
             }
             val uri = resolvedPath.toString()
-            // resolve ** only for local file system, we do not support this hack for HDFS
+            logInfo("URI is " + uri)
+            // resolve globstar pattern
             if (uri.contains(GLOBSTAR)) {
                 // buffer for all globally resolved file paths
                 val buffer: ArrayBuffer[String] = ArrayBuffer()
                 val arr = uri.split(Path.SEPARATOR)
                 val index = arr.indexOf(GLOBSTAR)
-                // make sure that path does not start with ** and does not end with **, otherwise
-                // process it as normal file pattern
-                if (index > 0 && index < arr.length - 1) {
+                // make sure that path does not start with **, though it can end with **. In this
+                // case we return everything that we can find recursively in that directory. If file
+                // pattern contains several globstars, we process only the first one, the rest will
+                // be part of normal file pattern.
+                if (index > 0 && index < arr.length) {
                     logInfo("Found global " + GLOBSTAR + " pattern for element " + elem +
                         ". This will be resolved according to org.apache.hadoop.fs.FileSystem " +
                         "and PathSuffixFilter")
                     // take everything before pattern, search recursively and filter by another part
-                    // we use index + 1 to drop globstar itself from suffix
+                    // we use index + 1 to drop globstar itself from suffix. If globstar is the last
+                    // item, then suffix should be additional `*`, since we want every match
                     val baseDirPattern = arr.take(index).mkString(Path.SEPARATOR)
-                    val filter = new PathSuffixFilter(arr.drop(index + 1).mkString(Path.SEPARATOR))
+                    val suffixPattern = if (index < arr.length - 1)
+                        arr.drop(index + 1).mkString(Path.SEPARATOR) else "*"
+                    val filter = new PathSuffixFilter(suffixPattern)
                     // resolve base directory as a sequence of Path files
                     val statuses = Option(fs.globStatus(new Path(baseDirPattern)))
                     if (statuses.isDefined) {

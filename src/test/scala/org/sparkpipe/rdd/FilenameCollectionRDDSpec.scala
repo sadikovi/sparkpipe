@@ -1,5 +1,6 @@
 package org.sparkpipe.rdd
 
+import org.apache.spark.SparkException
 import org.scalatest._
 import org.sparkpipe.rdd.implicits._
 import org.sparkpipe.test.spark.SparkLocal
@@ -10,6 +11,7 @@ class FilenameCollectionRDDSpec extends UnitTestSpec with SparkLocal with Before
         "rdd" + / + "*.txt"
     val configFilePattern = testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / +
         "util" + / + "config" + / + "*.conf"
+    val globPattern = testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / + "**"
 
     override def beforeAll(configMap: ConfigMap) {
         startSparkContext()
@@ -70,7 +72,7 @@ class FilenameCollectionRDDSpec extends UnitTestSpec with SparkLocal with Before
     }
 
     // issue #8 test
-    test("test splitPerFile option") {
+    test("issue #8 - test splitPerFile option") {
         val rdd = sc.fileName(Array(textFilePattern), 4, false)
         rdd.partitions.length should be (4)
         val splitRdd = sc.fileName(Array(textFilePattern), 4, true)
@@ -88,5 +90,24 @@ class FilenameCollectionRDDSpec extends UnitTestSpec with SparkLocal with Before
         val globFiles = globRdd.collect()
         globFiles.length should equal (files.length)
         globFiles.sortWith(_ < _) should equal (files.sortWith(_ < _))
+    }
+
+    // testing file paths when file pattern has globstar at end of pattern
+    test("issue #10 - globstar at the end of a pattern") {
+        val rdd = sc.fileName(Array(globPattern))
+        val files = rdd.map(_.stripPrefix("file:")).collect()
+
+        files.sortWith(_ < _) should equal (
+            Array(
+                testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / + "rdd" + / +
+                    "sample-log.txt",
+                testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / + "rdd" + / +
+                    "sample.txt",
+                testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / + "util" + / +
+                    "config" + / + "badproperties.conf",
+                testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / + "util" + / +
+                    "config" + / + "properties.conf"
+            ).sortWith(_ < _)
+        )
     }
 }
