@@ -91,7 +91,7 @@ private[rdd] class EncodePipedRDD[T: ClassTag](
                         err.close()
                     }
                 }),
-                daemonizeThreads=false
+                daemonizeThreads=true
             )
             // tokenize complex command, use resulting buffer as iterator
             val cmds = EncodePipedRDD.tokenize(elem.toString)
