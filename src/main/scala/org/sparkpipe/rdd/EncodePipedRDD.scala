@@ -106,9 +106,15 @@ private[rdd] class EncodePipedRDD[T: ClassTag](
             val exit = bufferedProcess.run(logger).exitValue()
 
             // check for errors and strict rule, if something has happened, return first error
-            if (executionRule && errbuf.nonEmpty) {
-                throw new IOException("Subprocess exited with status " + exit.toString + ". " +
-                    "Failed for elem: " + elem.toString + ", reason: " + errbuf.head)
+            // if rule is strict then throw exception, otherwise log error message
+            if (errbuf.nonEmpty) {
+                val errorMsg = "Subprocess exited with status " + exit.toString + ". " +
+                    "Failed for elem: " + elem.toString + ", reason: " + errbuf.head
+                if (executionRule) {
+                    throw new IOException(errorMsg)
+                } else {
+                    logError(errorMsg)
+                }
             }
         }
         // merge two buffers into one. Strategy: if error buffer is empty, return log buffer, else
