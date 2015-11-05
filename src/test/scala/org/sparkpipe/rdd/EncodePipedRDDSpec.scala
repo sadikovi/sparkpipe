@@ -89,4 +89,32 @@ class EncodePipedRDDSpec extends UnitTestSpec with SparkLocal with BeforeAndAfte
             b.count
         }
     }
+
+    /** Issue #11 - EncodePipedRDD redirect bug */
+    test("redirects to /dev/null or 2>&1") {
+        val testFile = testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / + "rdd" +
+            / + "sample.txt"
+        val expected = Source.fromFile(testFile).getLines().toArray
+        // testing 2>&1
+        val a = sc.parallelize(Array(testFile)).
+            map("cat " + _ + " 2>&1 | perl -ne 'print $_'").
+            pipeWithEncoding()
+        a.collect() should be (expected)
+        // testing /dev/null
+        val b = sc.parallelize(Array(testFile)).
+            map("cat " + _ + " 2>/dev/null | perl -ne 'print $_'").
+            pipeWithEncoding()
+        b.collect() should be (expected)
+        // testing cases where it should not drop them
+        val c = sc.parallelize(Array(testFile)).
+            map("cat " + _ + " 2 > &1 | perl -ne 'print $_'").
+            pipeWithEncoding("UTF-8", strict = false)
+        val rows = c.filter(_.startsWith("[ERROR]"))collect()
+        rows.length should be (3)
+        // testing escaped cases
+        val d = sc.parallelize(Array(testFile)).
+            map("cat " + _ + " 2>&1 | perl -ne 'print \"2>&1\".$_'").
+            pipeWithEncoding()
+        d.collect().forall(record => record.contains("2>&1")) should be (true)
+    }
 }

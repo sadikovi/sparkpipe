@@ -45,6 +45,9 @@ private[rdd] class EncodePipedRDD[T: ClassTag](
                 "-Dsun.jnu.encoding=YOUR_VALUE'"
             )
         }
+        // add warning saying that redirects will be dropped
+        logWarning("EncodePipedRDD currently does not support redirects, e.g. 2>/dev/null, 2>&1. " +
+            "These command tokens will be ignored, and stderr will go into error stream")
 
         // rule to apply on incorrect command
         // if true, it will enforce exception, otherwise, it will silence it returning as output
@@ -138,6 +141,9 @@ private[rdd] object EncodePipedRDD {
         val tmpbuf = new ArrayBuffer[String]()
         val token = new StringBuilder()
         var prevchr = '#'
+        // pattern for `::flushToken()` to remove redirects from command
+        // have to be careful not removing something else
+        val pattern = """^[^"']*>(/dev/null|&1)[^"']*$""".r
 
         // whether current state is quoted, so we need to ignore pipe characters
         def isQuoted(): Boolean = isDoubleQuoted || isSingleQuoted
@@ -151,8 +157,14 @@ private[rdd] object EncodePipedRDD {
         }
 
         // add read token to the a current command buffer, and clear the token
+        // we also filter out redirects, e.g. 2>&1, or >/dev/null, because we are using error and
+        // output stream instead, and it is quite difficult to change them depending on redirect.
         def flushToken() {
-            tmpbuf.append(token.toString())
+            val tokenString = token.toString()
+            // if someone is trying to use redirect, drop it
+            if (pattern.findFirstMatchIn(tokenString).isEmpty) {
+                tmpbuf.append(tokenString)
+            }
             token.clear()
         }
 
