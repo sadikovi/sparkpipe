@@ -91,7 +91,7 @@ class EncodePipedRDDSpec extends UnitTestSpec with SparkLocal with BeforeAndAfte
     }
 
     /** Issue #11 - EncodePipedRDD redirect bug */
-    test("redirects to /dev/null or 2>&1") {
+    test("issue #11 - redirects to /dev/null or 2>&1") {
         val testFile = testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / + "rdd" +
             / + "sample.txt"
         val expected = Source.fromFile(testFile).getLines().toArray
