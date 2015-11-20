@@ -21,6 +21,9 @@ package object implicits {
      * such as `sc.textFile`.
      */
     implicit class RichSparkContextFunctions(sc: SparkContext) {
+        // Maximum number of partitions when using `splitPerFile` option
+        val MAX_NUM_PARTITIONS: Int = 65536
+
         /**
          * Resolves local or HDFS file patterns and returns list with file paths.
          * `numSlices` is a number of partitions to use for file patterns, not results.
@@ -36,17 +39,24 @@ package object implicits {
             if (!splitPerFile) {
                 return rdd
             }
-            // cache RDD and repartition by number of files
+            // Cache RDD and repartition by number of files. We cannot exceed maximum number of
+            // partitions, after which splitPerFile will not work
             val numFiles = rdd.cache().count.toInt
-            if (numFiles > 0) rdd.repartition(numFiles) else rdd
+            if (numFiles > MAX_NUM_PARTITIONS) {
+                rdd.repartition(MAX_NUM_PARTITIONS)
+            } else if (numFiles > 0) {
+                rdd.repartition(numFiles)
+            } else {
+                rdd
+            }
         }
 
-        /** filename RDD with default number of partitions */
+        /** Filename RDD with default number of partitions */
         def fileName(files: Array[String]): RDD[String] = {
             fileName(files, sc.defaultMinPartitions, true)
         }
 
-        /** convinience method to specify paths as arguments */
+        /** Convinience method to specify paths as arguments */
         def fileName(files: String*): RDD[String] =
             fileName(files.toArray)
     }
