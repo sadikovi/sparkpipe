@@ -5,10 +5,9 @@ import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 import scala.util.Try
 import scala.util.control.NonFatal
+import org.apache.hadoop.fs.{FileSystem, Path, PathFilter, FileUtil}
 import org.apache.spark.{SparkContext, Partition, TaskContext, InterruptibleIterator}
 import org.apache.spark.rdd.RDD
-import org.apache.hadoop.mapred.JobConf
-import org.apache.hadoop.fs.{FileSystem, FileStatus, Path, PathFilter, FileUtil}
 
 /**
  * :: Experimental ::
@@ -33,18 +32,20 @@ import org.apache.hadoop.fs.{FileSystem, FileStatus, Path, PathFilter, FileUtil}
  * {{{
  * val filePattern = "/ data / * / * / *.gz"
  * val rdd = sc.fileName(filePattern)
- * // this will return
- * // /data/master/logs/log1.gz
- * // /data/master/temp/log2.gz
+ * }}}
+ * this will return:
+ * - /data/master/logs/log1.gz
+ * - /data/master/temp/log2.gz
  *
  * // though using globstar...
+ * {{{
  * val filePattern = "/ data / ** / *.gz"
  * val rdd = sc.fileName(filePattern)
- * // it will return
- * // /data/master/logs/log1.gz
- * // /data/master/temp/log2.gz
- * // /data/slave/slave-log.gz
  * }}}
+ * it will return:
+ * - /data/master/logs/log1.gz
+ * - /data/master/temp/log2.gz
+ * - /data/slave/slave-log.gz
  */
 
 /** PathFilter that converts suffix of file pattern into simple regular expression */
@@ -107,7 +108,7 @@ private[rdd] class FilenameCollectionRDD[T<:String: ClassTag] (
     @transient sc: SparkContext,
     @transient data: Seq[T],
     numSlices: Int
-) extends RDD[String](sc, Nil) {
+) extends FileRDD[String](sc, Nil) {
     override def getPartitions: Array[Partition] = {
         val slices = this.slice(data, numSlices).toArray
         slices.indices.map(i => new FilenameCollectionPartition[T](id, i, slices(i))).toArray
@@ -115,9 +116,11 @@ private[rdd] class FilenameCollectionRDD[T<:String: ClassTag] (
 
     override def compute(s: Partition, context: TaskContext): Iterator[String] = {
         val GLOBSTAR = "**"
+        val conf = getConf()
+
         val paths = for (elem <- s.asInstanceOf[FilenameCollectionPartition[T]].iterator) yield {
             val path = new Path(elem)
-            val fs = path.getFileSystem(new JobConf())
+            val fs = path.getFileSystem(conf)
             // resolve path, whether it is local path
             val resolvedPath = if (path.isAbsolute) {
                 path

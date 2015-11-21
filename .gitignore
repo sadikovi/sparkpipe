@@ -19,3 +19,6 @@ temp/
 .scala_dependencies
 .worksheet
 out/
+
+# ignore hive metastore db files
+metastore_db/

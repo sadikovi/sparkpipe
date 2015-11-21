@@ -59,6 +59,46 @@ package object implicits {
         /** Convinience method to specify paths as arguments */
         def fileName(files: String*): RDD[String] =
             fileName(files.toArray)
+
+        /**
+         * File statistics for a file pattern/s.
+         * Uses FilenameCollectionRDD to resolve patterns, allows to repartition files afterwards.
+         * Returns RDD of [[FileStatistics]] entries.
+         */
+        def fileStats(
+            files: Array[String],
+            withChecksum: Boolean,
+            numPartitions: Int
+        ): RDD[FileStatistics] = {
+            // process and resolve files
+            val numFiles = files.length
+            val splitPerFile = numPartitions <= 0
+            val filesCollection = fileName(files, numFiles, splitPerFile)
+            // if number of partitions specified, we do not split per file, as we can repartition
+            // it once afterwards
+            val rdd = if (numPartitions > 0) {
+                filesCollection.repartition(numPartitions)
+            } else {
+                filesCollection
+            }
+            new FileStatisticsRDD(rdd, withChecksum)
+        }
+
+        /** Convinience method for file statistics since usually only one pattern is passed */
+        def fileStats(
+            pattern: String,
+            withChecksum: Boolean,
+            numPartitions: Int
+        ): RDD[FileStatistics] =
+            fileStats(Array[String](pattern), withChecksum, numPartitions)
+
+        /** File statistics with maximum number of partitions, each file per partition */
+        def fileStats(files: Array[String], withChecksum: Boolean): RDD[FileStatistics] =
+            fileStats(files, withChecksum, numPartitions = 0)
+
+        /** File statistics with maximum number of partitions, each file per partition */
+        def fileStats(files: String*): RDD[FileStatistics] =
+            fileStats(files.toArray, withChecksum = true, numPartitions = 0)
     }
 
     /**
