@@ -35,7 +35,7 @@ sealed class CollectionFunction(
     }
 
     def update(buffer: MutableAggregationBuffer, input: Row): Unit = {
-        if (buffer != null) {
+        if (buffer(0) != null) {
             val seq = buffer(0).asInstanceOf[IndexedSeq[Long]]
             if (seq.length < limit) {
                 buffer(0) = input.getAs[Long](0) +: seq

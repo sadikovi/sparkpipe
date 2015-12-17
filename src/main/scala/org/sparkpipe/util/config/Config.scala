@@ -78,7 +78,7 @@ private[config] class Config(private val iter: Iterator[String], val mode: Dupli
      * @param section section
      * @return hash key
      */
-    private def hashkey(key:String, section:String): String = "@" + key + "###" + section
+    private def hashkey(key: String, section: String): String = "@" + key + "###" + section
 
     /**
      * Method stores key in map provided, as map is mutable.
@@ -122,8 +122,8 @@ private[config] class Config(private val iter: Iterator[String], val mode: Dupli
      */
     private def getKeyFromMap(
         map: Map[String, String],
-        key:String,
-        section:String
+        key: String,
+        section: String
     ): Option[String] = {
         val hash = hashkey(key, section)
         map.get(hash)
@@ -232,7 +232,7 @@ object Config {
      * @param mode parsing rule for duplicates, default is override
      * @return loaded configuration
      */
-    def fromPath(path: String, mode: DuplicateMode.Value=DuplicateMode.Override): Config = {
+    def fromPath(path: String, mode: DuplicateMode.Value = DuplicateMode.Override): Config = {
         val iter = Source.fromFile(path).getLines()
         new Config(iter, mode)
     }
@@ -243,7 +243,7 @@ object Config {
      * @param mode parsing rule for duplicates, default is override
      * @return loaded configuration
      */
-    def fromFile(file: File, mode: DuplicateMode.Value=DuplicateMode.Override): Config = {
+    def fromFile(file: File, mode: DuplicateMode.Value = DuplicateMode.Override): Config = {
         val iter = Source.fromFile(file).getLines()
         new Config(iter, mode)
     }
@@ -256,7 +256,7 @@ object Config {
      */
     def fromStream(
         stream: InputStream,
-        mode: DuplicateMode.Value=DuplicateMode.Override
+        mode: DuplicateMode.Value = DuplicateMode.Override
     ): Config = {
         val iter = Source.fromInputStream(stream).getLines()
         new Config(iter, mode)

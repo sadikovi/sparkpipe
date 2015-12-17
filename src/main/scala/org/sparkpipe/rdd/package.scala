@@ -109,14 +109,15 @@ package object implicits {
      */
     implicit class RichRDDFunctions[T: ClassTag](rdd: RDD[T]) {
         /** pipes parent RDD with encoding specified */
-        def pipeWithEncoding(encoding: String, strict: Boolean) =
+        def pipeWithEncoding(encoding: String, strict: Boolean): EncodePipedRDD[T] =
             new EncodePipedRDD[T](rdd, encoding, strict)
 
         /** pipes parent RDD with codec specified */
-        def pipeWithEncoding(codec: Codec, strict: Boolean) =
+        def pipeWithEncoding(codec: Codec, strict: Boolean): EncodePipedRDD[T] =
             new EncodePipedRDD[T](rdd, codec, strict)
 
         /** pipes parent RDD with default UTF-8 encoding */
-        def pipeWithEncoding() = new EncodePipedRDD[T](rdd, Codec.UTF8, strict=true)
+        def pipeWithEncoding(): EncodePipedRDD[T] =
+            new EncodePipedRDD[T](rdd, Codec.UTF8, strict = true)
     }
 }

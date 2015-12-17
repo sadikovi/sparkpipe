@@ -56,7 +56,7 @@ private[rdd] class PathSuffixFilter(private val regex: String) extends PathFilte
         // escape original [.^$] with \symbol
         val escapedStr = str.replaceAllLiterally(".", "\\.").replaceAllLiterally("^", "\\^").
         replaceAllLiterally("$", "\\$")
-        //now replace all occuriences of [*] on [.*]
+        // now replace all occuriences of [*] on [.*]
         val pattern = escapedStr.replaceAllLiterally("*", ".*")
         // return final pattern, close regex if you want to match exactly (recommended)
         if (matchExactly) "^" + pattern + "$" else pattern
@@ -87,7 +87,7 @@ private[rdd] class FilenameCollectionPartition[T: ClassTag] (
 
     override def hashCode(): Int = (41 * (41 + rddId) + slice).toInt
 
-    override def equals(other:Any): Boolean = other match {
+    override def equals(other: Any): Boolean = other match {
         case that: FilenameCollectionPartition[_] =>
             this.rddId == that.rddId && this.slice == that.slice
         case _ => false
@@ -148,8 +148,12 @@ private[rdd] class FilenameCollectionRDD[T<:String: ClassTag] (
                     // we use index + 1 to drop globstar itself from suffix. If globstar is the last
                     // item, then suffix should be additional `*`, since we want every match
                     val baseDirPattern = arr.take(index).mkString(Path.SEPARATOR)
-                    val suffixPattern = if (index < arr.length - 1)
-                        arr.drop(index + 1).mkString(Path.SEPARATOR) else "*"
+                    val suffixPattern = if (index < arr.length - 1) {
+                        arr.drop(index + 1).mkString(Path.SEPARATOR)
+                    } else {
+                        "*"
+                    }
+
                     val filter = new PathSuffixFilter(suffixPattern)
                     // resolve base directory as a sequence of Path files
                     val statuses = Option(fs.globStatus(new Path(baseDirPattern)))
