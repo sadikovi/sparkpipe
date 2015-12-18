@@ -13,13 +13,13 @@ import org.sparkpipe.sql.types.{Buffer, BufferType}
  * allows to overcome problem of Out Of Memory (Java heap) exception for datasets with large
  * cardinality.
  * {{{
- * import org.sparkpipe.sql.expressions.aggregate.BufferAggregationFunction
+ * import org.sparkpipe.sql.expressions.aggregate.BufferAggregateFunction
  * val a = sc.parallelize(0L to 20L).map(x => (x, x % 4)).toDF("value", "group")
- * val cl = new BufferAggregationFunction(5)
+ * val cl = new BufferAggregateFunction(5)
  * val df = a.groupBy("group").agg(cl($"value").as("list")).cache()
  * }}}
  */
- class BufferAggregationFunction(
+ class BufferAggregateFunction(
      private val tslimit: Int
  ) extends UserDefinedAggregateFunction {
      def inputSchema: StructType =
