@@ -11,8 +11,10 @@ package org.sparkpipe.rdd
 package object implicits {
     import scala.io.Codec
     import scala.reflect.ClassTag
+    import org.apache.hadoop.io.{LongWritable, Text}
+    import org.apache.hadoop.mapred.{TextInputFormat, FileSplit}
     import org.apache.spark.SparkContext
-    import org.apache.spark.rdd.RDD
+    import org.apache.spark.rdd.{RDD, HadoopRDD}
 
     /**
      * :: Experimental ::
@@ -99,6 +101,34 @@ package object implicits {
         /** File statistics with maximum number of partitions, each file per partition */
         def fileStats(files: String*): RDD[FileStatistics] =
             fileStats(files.toArray, withChecksum = true, numPartitions = 0)
+
+        /** Return RDD of pairs of filename, offset in bytes, and content line */
+        def textContent(
+            path: String,
+            minPartitions: Int = sc.defaultMinPartitions
+        ): RDD[(String, Long, String)] = {
+            val rdd = sc.hadoopFile(path, classOf[TextInputFormat], classOf[LongWritable],
+                classOf[Text], minPartitions).asInstanceOf[HadoopRDD[LongWritable, Text]]
+
+            val hadoopRDD = rdd.mapPartitionsWithInputSplit((split, iter) => {
+                val path = split.asInstanceOf[FileSplit].getPath().toString()
+
+                new Iterator[(String, Long, String)] {
+                    def next(): (String, Long, String) = {
+                        val pair = iter.next()
+                        val bytes: Long = pair._1.get()
+                        val content: String = pair._2.toString
+                        // return path to the file split and content for the line
+                        (path, bytes, content)
+                    }
+
+                    def hasNext: Boolean = {
+                        iter.hasNext
+                    }
+                }
+            }, preservesPartitioning = true)
+            hadoopRDD
+        }
     }
 
     /**
