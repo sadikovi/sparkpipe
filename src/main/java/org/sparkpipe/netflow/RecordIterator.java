@@ -12,10 +12,10 @@ import org.apache.hadoop.fs.FSDataInputStream;
 
 public class RecordIterator implements Iterator<Object[]> {
     // length of the buffer, usually 32768
-    public static final int BUFFER_LENGTH = 64;
+    public static final int BUFFER_LENGTH = 32768;
 
     /**
-     * Create RecordIterator using input stream of data.
+     * Create RecordIterator with default buffer length.
      * @param in input stream of raw data
      * @param hl record holder, currently only V5 is supported
      * @param ord byte order to use when creating buffer to read record
@@ -23,10 +23,29 @@ public class RecordIterator implements Iterator<Object[]> {
      * @return iterator of records as Object[]
      */
     public RecordIterator(FSDataInputStream in, NetflowRecord hl, ByteOrder ord, boolean isCmp) {
+        this(in, hl, ord, isCmp, BUFFER_LENGTH);
+    }
+
+    /**
+     * Create RecordIterator using input stream of data.
+     * @param in input stream of raw data
+     * @param hl record holder, currently only V5 is supported
+     * @param ord byte order to use when creating buffer to read record
+     * @param isCmp boolean flag, showing that raw data is compressed
+     * @param bufLen length of buffer for compressed stream
+     * @return iterator of records as Object[]
+     */
+    public RecordIterator(
+        FSDataInputStream in,
+        NetflowRecord hl,
+        ByteOrder ord,
+        boolean isCmp,
+        int bufLen
+    ) {
         RECORD_SIZE = hl.size();
         // instantiate appropriate stream for the compression
         if (isCmp) {
-            stream = new InflaterInputStream(in, new Inflater(), BUFFER_LENGTH);
+            stream = new InflaterInputStream(in, new Inflater(), bufLen);
             compression = true;
         } else {
             stream = in;
@@ -75,15 +94,18 @@ public class RecordIterator implements Iterator<Object[]> {
                     System.arraycopy(secondary, 0, primary, numBytes, remaining);
                 }
             }
-
-            if (!hasNext && stream != null) {
-                stream.close();
-            }
         } catch (IOException io) {
             System.out.println("[ERROR] " + io.getMessage());
-            // TODO: log failure
             hasNext = false;
         } finally {
+            if (!hasNext && stream != null) {
+                try {
+                    stream.close();
+                } catch (IOException io) {
+                    System.out.println("[ERROR] Stream failed to close");
+                    stream = null;
+                }
+            }
             return hasNext;
         }
     }
