@@ -1,4 +1,4 @@
-package org.sparkpipe.netflow;
+package org.sparkpipe.netflow.fields;
 
 import java.nio.ByteOrder;
 

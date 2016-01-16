@@ -7,7 +7,8 @@ import io.netty.buffer.ByteBuf;
 abstract class NetflowRecord {
     /**
      * Process buffer of the record and return sequence of fields in order requested. Do not handle
-     * byte buffer within the method, it will be taken care of in outer caller.
+     * byte buffer within the method, it will be taken care of in outer caller. Buffer is a wrapped
+     * buffer on constantly updating array of bytes of the size of the record.
      */
     public abstract Object[] processRecord(ByteBuf buffer);
 

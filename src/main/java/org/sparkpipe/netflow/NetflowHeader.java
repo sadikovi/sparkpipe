@@ -1,6 +1,8 @@
 package org.sparkpipe.netflow;
 
 import java.nio.ByteOrder;
+import org.sparkpipe.netflow.fields.InterfaceAlias;
+import org.sparkpipe.netflow.fields.InterfaceName;
 
 /** Header for stream version of Netflow file */
 public class NetflowHeader {
@@ -213,6 +215,16 @@ public class NetflowHeader {
     /** Get header comments */
     public String getComments() {
         return this.comments;
+    }
+
+    /** Get aggregation method */
+    public short getAggMethod() {
+        return this.aggregationMethod;
+    }
+
+    /** Get aggregation version */
+    public short getAggVersion() {
+        return this.aggregationVersion;
     }
 
     // bit vector of fields
