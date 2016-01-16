@@ -22,3 +22,6 @@ out/
 
 # ignore hive metastore db files
 metastore_db/
+
+# remove DS_Store
+.DS_Store

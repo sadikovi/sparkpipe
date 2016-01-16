@@ -56,13 +56,13 @@ public class NetflowV5Record extends NetflowRecord {
 
     public NetflowV5Record(long[] askedFields) {
         int len = askedFields.length;
+        if (len == 0) {
+            throw new UnsupportedOperationException("Fields required, found empty array");
+        }
         this.fields = askedFields;
-        this.positions = new int[len];
         long fld;
         for (int i=0; i<len; i++) {
             fld = this.fields[i];
-            // update position for the field, which is actual size before update
-            this.positions[i] = this.actualSize;
             // increment size
             if (fld == V5_FIELD_UNIX_SECS || fld == V5_FIELD_UNIX_NSECS ||
                 fld == V5_FIELD_SYSUPTIME || fld == V5_FIELD_EXADDR || fld == V5_FIELD_SRCADDR ||
@@ -83,68 +83,69 @@ public class NetflowV5Record extends NetflowRecord {
         }
     }
 
-    public byte[] processRecord(ByteBuf buffer) {
-        // initialize a new record
-        byte[] record = new byte[this.actualSize];
-        // go through each field and fill up buffer
+    /** Process record using buffer on the raw full-sized record */
+    public Object[] processRecord(ByteBuf buffer) {
         int len = this.fields.length;
+        // initialize a new record
+        Object[] record = new Object[len];
+        // go through each field and fill up buffer
         for (int i=0; i<len; i++) {
-            writeField(this.fields[i], buffer, this.positions[i], record);
+            writeField(this.fields[i], buffer, i, record);
         }
         return record;
     }
 
     // copy bytes from buffer to the record
-    private void writeField(long fld, ByteBuf buffer, int pos, byte[] record) {
+    private void writeField(long fld, ByteBuf buffer, int pos, Object[] record) {
         if (fld == V5_FIELD_UNIX_SECS) {
-            buffer.getBytes(0, record, pos, 4);
+            record[pos] = buffer.getUnsignedInt(0);
         } else if (fld == V5_FIELD_UNIX_NSECS) {
-            buffer.getBytes(4, record, pos, 4);
+            record[pos] = buffer.getUnsignedInt(4);
         } else if (fld == V5_FIELD_SYSUPTIME) {
-            buffer.getBytes(8, record, pos, 4);
+            record[pos] = buffer.getUnsignedInt(8);
         } else if (fld == V5_FIELD_EXADDR) {
-            buffer.getBytes(12, record, pos, 4);
+            record[pos] = buffer.getUnsignedInt(12);
         } else if (fld == V5_FIELD_SRCADDR) {
-            buffer.getBytes(16, record, pos, 4);
+            record[pos] = buffer.getUnsignedInt(16);
         } else if (fld == V5_FIELD_DSTADDR) {
-            buffer.getBytes(20, record, pos, 4);
+            record[pos] = buffer.getUnsignedInt(20);
         } else if (fld == V5_FIELD_NEXTHOP) {
-            buffer.getBytes(24, record, pos, 4);
+            record[pos] = buffer.getUnsignedInt(24);
         } else if (fld == V5_FIELD_INPUT) {
-            buffer.getBytes(28, record, pos, 2);
+            record[pos] = buffer.getUnsignedShort(28);
         } else if (fld == V5_FIELD_OUTPUT) {
-            buffer.getBytes(30, record, pos, 2);
+            record[pos] = buffer.getUnsignedShort(30);
         } else if (fld == V5_FIELD_DPKTS) {
-            buffer.getBytes(32, record, pos, 4);
+            record[pos] = buffer.getUnsignedInt(32);
         } else if (fld == V5_FIELD_DOCTETS) {
-            buffer.getBytes(36, record, pos, 4);
+            record[pos] = buffer.getUnsignedInt(36);
         } else if (fld == V5_FIELD_FIRST) {
-            buffer.getBytes(40, record, pos, 4);
+            record[pos] = buffer.getUnsignedInt(40);
         } else if (fld == V5_FIELD_LAST) {
-            buffer.getBytes(44, record, pos, 4);
+            record[pos] = buffer.getUnsignedInt(44);
         } else if (fld == V5_FIELD_SRCPORT) {
-            buffer.getBytes(48, record, pos, 2);
+            record[pos] = buffer.getUnsignedShort(48);
         } else if (fld == V5_FIELD_DSTPORT) {
-            buffer.getBytes(50, record, pos, 2);
+            record[pos] = buffer.getUnsignedShort(50);
         } else if (fld == V5_FIELD_PROT) {
-            buffer.getBytes(52, record, pos, 1);
+            record[pos] = buffer.getUnsignedByte(52);
         } else if (fld == V5_FIELD_TOS) {
-            buffer.getBytes(53, record, pos, 1);
+            record[pos] = buffer.getUnsignedByte(53);
         } else if (fld == V5_FIELD_TCP_FLAGS) {
-            buffer.getBytes(54, record, pos, 1);
+            record[pos] = buffer.getUnsignedByte(54);
         } else if (fld == V5_FIELD_ENGINE_TYPE) {
             // there is field "pad" which is unused byte in record, we skip it
-            buffer.getBytes(56, record, pos, 1);
+            record[pos] = buffer.getUnsignedByte(56);
         } else if (fld == V5_FIELD_ENGINE_ID) {
-            buffer.getBytes(57, record, pos, 1);
+            record[pos] = buffer.getUnsignedByte(57);
         } else if (fld == V5_FIELD_SRC_MASK) {
-            buffer.getBytes(58, record, pos, 1);
+            record[pos] = buffer.getUnsignedByte(58);
         } else if (fld == V5_FIELD_DST_MASK) {
-            buffer.getBytes(59, record, pos, 1);
+            record[pos] = buffer.getUnsignedByte(59);
         } else if (fld == V5_FIELD_SRC_AS) {
-            buffer.getBytes(60, record, pos, 2);
+            record[pos] = buffer.getUnsignedShort(60);
         } else if (fld == V5_FIELD_DST_AS) {
-            buffer.getBytes(62, record, pos, 2);
+            record[pos] = buffer.getUnsignedShort(62);
         }
     }
 

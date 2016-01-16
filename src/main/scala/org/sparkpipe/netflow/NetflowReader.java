@@ -2,6 +2,8 @@ package org.sparkpipe.netflow;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.util.zip.Inflater;
+import java.util.zip.InflaterInputStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -286,6 +288,34 @@ public class NetflowReader {
             pr = null;
         }
         return header;
+    }
+
+    public GeneralRecordIterator readData(
+        NetflowHeader header,
+        long[] askedFields,
+        int bufferLen
+    ) throws IOException, UnsupportedOperationException {
+        // place readerIndex to the beginning of the file's payload
+        int expectedPosition = header.getHeaderSize();
+        short flowVersion = header.getFlowVersion();
+        this.in.seek(expectedPosition);
+
+        // initialize record holder
+        NetflowRecord recordHolder;
+        if (flowVersion == 5) {
+            recordHolder = new NetflowV5Record(askedFields);
+        } else {
+            throw new UnsupportedOperationException("Unsupported flow version " + flowVersion);
+        }
+
+        // depending on compression return valid iterator
+        if ((header.getHeaderFlags() & NetflowHeader.HEADER_FLAG_COMPRESS) > 0) {
+            Inflater inf = new Inflater();
+            InflaterInputStream compressedStream = new InflaterInputStream(in, inf, bufferLen);
+            return new CompressedRecordIterator(compressedStream, recordHolder, order);
+        } else {
+            return new RecordIterator(in, recordHolder, order);
+        }
     }
 
     ////////////////////////////////////////////////////////////
