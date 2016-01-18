@@ -227,8 +227,12 @@ public class NetflowHeader {
         return this.aggregationVersion;
     }
 
+    public long getFields() {
+        return this.FIELDS;
+    }
+
     // bit vector of fields
-    public long FIELDS = 0;
+    private long FIELDS = 0;
     // flow stream format version either 1 or 3
     private short sversion = 0;
     // byte order, either big endian or little endian

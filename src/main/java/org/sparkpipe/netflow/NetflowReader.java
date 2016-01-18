@@ -5,6 +5,7 @@ import java.nio.ByteOrder;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.sparkpipe.netflow.flow.version.NetflowV5;
 
 // Parsing Netflow file
 public class NetflowReader {
@@ -73,6 +74,7 @@ public class NetflowReader {
             this.in.seek(METADATA_LENGTH);
         }
 
+        // read header differently depending on stream version (not flow version)
         if (this.sversion == 1) {
             // version 1 has static header
             // TODO: verify header size for stream version 1
@@ -288,6 +290,14 @@ public class NetflowReader {
         return header;
     }
 
+    /**
+     * Return iterator of Object records for specified fields. Note that values will have the same
+     * order as fields in array.
+     * @param NetflowHeader header
+     * @param askedFields fields wanted
+     * @return record iterator
+     * @throws IOException, UnsupportedOperationException
+     */
     public RecordIterator readData(
         NetflowHeader header,
         long[] askedFields
@@ -299,15 +309,15 @@ public class NetflowReader {
         this.in.seek(expectedPosition);
 
         // initialize record holder
-        NetflowRecord recordHolder;
+        SFlow flowInterface;
         if (flowVersion == 5) {
-            recordHolder = new NetflowV5Record(askedFields);
+            flowInterface = new NetflowV5(askedFields);
         } else {
             throw new UnsupportedOperationException("Unsupported flow version " + flowVersion);
         }
 
         boolean isCompressed = (header.getHeaderFlags() & NetflowHeader.HEADER_FLAG_COMPRESS) > 0;
-        return new RecordIterator(in, recordHolder, order, isCompressed);
+        return new RecordIterator(in, flowInterface, order, isCompressed);
     }
 
     ////////////////////////////////////////////////////////////

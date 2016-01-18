@@ -1,9 +1,10 @@
-package org.sparkpipe.netflow;
+package org.sparkpipe.netflow.flow.version;
 
 import java.util.HashMap;
 import io.netty.buffer.ByteBuf;
+import org.sparkpipe.netflow.SFlow;
 
-public class NetflowV5Record extends NetflowRecord {
+public class NetflowV5 extends SFlow {
     // list of supported columns and size in bytes
     // Current seconds since 0000 UTC 1970, size: 4
     public static final long V5_FIELD_UNIX_SECS = 0x00000001L;
@@ -54,7 +55,7 @@ public class NetflowV5Record extends NetflowRecord {
     // AS of destination address, size: 2
     public static final long V5_FIELD_DST_AS = 0x00800000L;
 
-    public NetflowV5Record(long[] askedFields) {
+    public NetflowV5(long[] askedFields) {
         int len = askedFields.length;
         if (len == 0) {
             throw new UnsupportedOperationException("Fields required, found empty array");

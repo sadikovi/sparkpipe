@@ -17,12 +17,12 @@ public class RecordIterator implements Iterator<Object[]> {
     /**
      * Create RecordIterator with default buffer length.
      * @param in input stream of raw data
-     * @param hl record holder, currently only V5 is supported
+     * @param hl aggregator, flow interface
      * @param ord byte order to use when creating buffer to read record
      * @param isCmp boolean flag, showing that raw data is compressed
      * @return iterator of records as Object[]
      */
-    public RecordIterator(FSDataInputStream in, NetflowRecord hl, ByteOrder ord, boolean isCmp) {
+    public RecordIterator(FSDataInputStream in, SFlow hl, ByteOrder ord, boolean isCmp) {
         this(in, hl, ord, isCmp, BUFFER_LENGTH);
     }
 
@@ -37,7 +37,7 @@ public class RecordIterator implements Iterator<Object[]> {
      */
     public RecordIterator(
         FSDataInputStream in,
-        NetflowRecord hl,
+        SFlow hl,
         ByteOrder ord,
         boolean isCmp,
         int bufLen
@@ -120,7 +120,7 @@ public class RecordIterator implements Iterator<Object[]> {
 
     private boolean compression;
     private FilterInputStream stream;
-    private NetflowRecord recordHolder;
+    private SFlow recordHolder;
     private byte[] primary;
     private byte[] secondary;
     private ByteBuf buffer;

@@ -3,8 +3,8 @@ package org.sparkpipe.netflow;
 import java.util.HashMap;
 import io.netty.buffer.ByteBuf;
 
-/** Generic Netflow record */
-abstract class NetflowRecord {
+/** Generic Netflow PDU reading interface */
+public abstract class SFlow {
     /**
      * Process buffer of the record and return sequence of fields in order requested. Do not handle
      * byte buffer within the method, it will be taken care of in outer caller. Buffer is a wrapped
