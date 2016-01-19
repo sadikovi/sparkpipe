@@ -38,6 +38,8 @@ private trait Mapper {
     // return full schema for a version
     def getFullSchema(): StructType
 
+    def getInternalColumns(): Array[Long]
+
     def getInternalColumnForName(name: String): Long
 }
 
@@ -49,6 +51,8 @@ private object MapperV5 extends Mapper {
         val sqlColumns = columns.map(field => StructField(field.name, field.dtype, false))
         StructType(sqlColumns)
     }
+
+    override def getInternalColumns(): Array[Long] = columns.map(_.index).toArray
 
     override def getInternalColumnForName(name: String): Long = {
         index.getOrElse(name, sys.error(s"Index does not have information about column ${name}"))

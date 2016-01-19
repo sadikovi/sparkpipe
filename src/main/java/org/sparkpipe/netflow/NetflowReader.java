@@ -295,12 +295,14 @@ public class NetflowReader {
      * order as fields in array.
      * @param NetflowHeader header
      * @param askedFields fields wanted
+     * @param bufferSize buffer size for the iterator
      * @return record iterator
      * @throws IOException, UnsupportedOperationException
      */
     public RecordIterator readData(
         NetflowHeader header,
-        long[] askedFields
+        long[] askedFields,
+        int bufferSize
     ) throws IOException, UnsupportedOperationException {
         ensureStreamVersion();
         // place readerIndex to the beginning of the file's payload
@@ -317,7 +319,7 @@ public class NetflowReader {
         }
 
         boolean isCompressed = (header.getHeaderFlags() & NetflowHeader.HEADER_FLAG_COMPRESS) > 0;
-        return new RecordIterator(in, flowInterface, order, isCompressed);
+        return new RecordIterator(in, flowInterface, order, isCompressed, bufferSize);
     }
 
     ////////////////////////////////////////////////////////////
