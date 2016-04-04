@@ -93,8 +93,17 @@ private[rdd] class EncodePipedRDD[T: ClassTag](
                 }),
                 daemonizeThreads = true
             )
-            // tokenize complex command, use resulting buffer as iterator
-            val cmds = EncodePipedRDD.tokenize(elem.toString)
+            // tokenize complex command, use resulting buffer as iterator. Note that sometimes
+            // command can contain `*` that sclaa process builder cannot handle in file paths, so
+            // in this situations `globalTokenize()` command is used
+            val origCmd = elem.toString
+            val escape = EncodePipedRDD.ESCAPE_PATTERN.r.findFirstMatchIn(origCmd).isDefined
+            val cmds = if (escape) {
+                logWarning(s"Glob star was found in command ${origCmd}, global tokenizer is used")
+                EncodePipedRDD.globalTokenize(origCmd)
+            } else {
+                EncodePipedRDD.tokenize(origCmd)
+            }
             // create buffered process from all the commands
             var bufferedProcess: ProcessBuilder = null
             cmds.foreach(cmd => {
@@ -128,6 +137,9 @@ private[rdd] class EncodePipedRDD[T: ClassTag](
 }
 
 private[rdd] object EncodePipedRDD {
+    // This will escape commands that have expansion "glob" stars
+    val ESCAPE_PATTERN = """(\/\w*\*\w*)"""
+
     /**
      * Splits command by pipe into several simple commands for processes
      * e.g. cat temp/sample.log | grep -i "\" | a" will become
@@ -204,5 +216,18 @@ private[rdd] object EncodePipedRDD {
         flushCmd()
         // and return complete command buffer
         cmdbuf
+    }
+
+    /** Create global token sequence including system shell and command itself */
+    def globalTokenize(cmd: String): ArrayBuffer[Array[String]] = {
+        val cmdSeq: String => Array[String] = System.getProperty("os.name").toLowerCase match {
+            case osname if osname.startsWith("windows") =>
+                Array("cmd", "/c", _)
+            case osname if osname.startsWith("linux") || osname.startsWith("mac") =>
+                Array("bash", "-c", _)
+            case other =>
+                throw new UnsupportedOperationException(s"OS ${other} is not supported")
+        }
+        ArrayBuffer[Array[String]](cmdSeq(cmd))
     }
 }
