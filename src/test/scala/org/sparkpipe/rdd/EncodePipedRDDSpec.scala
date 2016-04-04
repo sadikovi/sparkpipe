@@ -117,4 +117,29 @@ class EncodePipedRDDSpec extends UnitTestSpec with SparkLocal with BeforeAndAfte
             pipeWithEncoding()
         d.collect().forall(record => record.contains("2>&1")) should be (true)
     }
+
+    test("cat command with * pattern in file path") {
+        // pattern to resolve
+        val pattern = testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / + "*" +
+            / + "sample.txt"
+        // the actual path to the file that pattern is supposed to be resolved to
+        val testFile = testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / + "rdd" +
+            / + "sample.txt"
+        val a = sc.parallelize(Array(pattern)).
+            map("cat " + _).
+            pipeWithEncoding()
+        // Expected lines from two files
+        val expected = Source.fromFile(testFile).getLines().toArray
+        a.collect() should be (expected)
+    }
+
+    test("find command with * pattern in file path") {
+        val pattern = testDirectory + / + "resources" + / + "org" + / + "sparkpipe" + / + "*"
+        val a = sc.parallelize(Array(pattern)).
+            map("find " + _ + " -type f -name sample-log.txt").
+            pipeWithEncoding()
+        // Expected lines from two files
+        a.count() should be (1)
+        a.first().endsWith("sample-log.txt") should be (true)
+    }
 }
