@@ -48,8 +48,7 @@ private[rdd] class EncodePipedRDD[T: ClassTag](
         "be applied, driver program may display different result. It is recommended to " +
         "set configuration options 'spark.driver.extraJavaOptions' and/or " +
         "'spark.executor.extraJavaOptions' to be '-Dfile.encoding=YOUR_VALUE " +
-        "-Dsun.jnu.encoding=YOUR_VALUE'"
-      )
+        "-Dsun.jnu.encoding=YOUR_VALUE'")
     }
 
     // rule to apply on malformed exception
