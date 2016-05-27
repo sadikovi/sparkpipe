@@ -1,208 +1,168 @@
 package org.sparkpipe.rdd
 
-import java.io.IOException
+import java.io.{BufferedWriter, OutputStreamWriter, PrintWriter}
 import java.nio.charset.CodingErrorAction
+import java.util.StringTokenizer
+import java.util.concurrent.atomic.AtomicReference
+
+import scala.collection.JavaConverters._
+import scala.collection.Map
 import scala.collection.mutable.ArrayBuffer
 import scala.io.{Source, Codec}
 import scala.reflect.ClassTag
-import scala.sys.process.{Process, ProcessBuilder, ProcessIO}
-import scala.util.control.NonFatal
+
 import org.apache.spark.{Partition, TaskContext}
 import org.apache.spark.rdd.RDD
 
-/**
- * Piped RDD with encoding.
- * Encoding can be specified as string or Codec.
- * `strict` parameter allows to silence errors during reading. They will be returned as a part of
- * dataset with prefix "[ERROR]". Otherwise exception is thrown, for invalid command, as well as
- * malicious input.
- */
 private[rdd] class EncodePipedRDD[T: ClassTag](
     prev: RDD[T],
-    private val encoding: String,
-    private val strict: Boolean
-) extends RDD[String](prev) {
+    command: Seq[String],
+    encoding: String,
+    strict: Boolean,
+    envVars: Map[String, String],
+    bufferSize: Int)
+  extends RDD[String](prev) {
 
-    /**
-     * Allows to specify codec instead of encoding string.
-     * although `on...` actions are dropped, specify them using `strict` parameter
-     */
-    def this(prev: RDD[T], codec: Codec, strict: Boolean) = this(prev, codec.toString, strict)
+  require(command.nonEmpty,
+    s"Tokenizer returned empty command from ${command.mkString("(", ", ", ")")}")
+  require(encoding.nonEmpty, "Encoding is empty")
 
-    override def getPartitions: Array[Partition] = firstParent[T].partitions
+  // Similar to Runtime.exec(), if we are given a single string, split it into words
+  // using a standard StringTokenizer (i.e. by spaces)
+  def this(prev: RDD[T], command: String, encoding: String, strict: Boolean) =
+    this(prev, EncodePipedRDD.tokenize(command), encoding, strict, Map(), 8192)
 
-    override def compute(split: Partition, context: TaskContext): Iterator[String] = {
-        // set warning if `file.encoding` and `sun.jnu.encoding` properties do not match specified
-        // encoding, also display how to resolve problem.
-        val fileEncodingProp = Option(System.getProperty("file.encoding"))
-        val sunJnuEncodingProp = Option(System.getProperty("sun.jnu.encoding"))
-        if (!fileEncodingProp.isDefined || !sunJnuEncodingProp.isDefined ||
-            !fileEncodingProp.get.equals(encoding) || !sunJnuEncodingProp.get.equals(encoding)) {
-            logWarning("System encoding is different from " + encoding + ". Even encoding will " +
-                "be applied, driver program may display different result. It is recommended to " +
-                "set configuration options 'spark.driver.extraJavaOptions' and/or " +
-                "'spark.executor.extraJavaOptions' to be '-Dfile.encoding=YOUR_VALUE " +
-                "-Dsun.jnu.encoding=YOUR_VALUE'"
-            )
-        }
-        // add warning saying that redirects will be dropped
-        logWarning("EncodePipedRDD currently does not support redirects, e.g. 2>/dev/null, 2>&1. " +
-            "These command tokens will be ignored, and stderr will go into error stream")
+  def this(prev: RDD[T], command: String, codec: Codec, strict: Boolean) =
+    this(prev, command, codec.toString, strict)
 
-        // rule to apply on incorrect command
-        // if true, it will enforce exception, otherwise, it will silence it returning as output
-        val executionRule = strict
-        // rule to apply on malformed exception
-        val malformedRule = if (strict) CodingErrorAction.REPORT else CodingErrorAction.REPLACE
+  override def getPartitions: Array[Partition] = firstParent[T].partitions
 
-        // create buffers for output and errors, those are always string buffers
-        val logbuf: ArrayBuffer[String] = ArrayBuffer()
-        val errbuf: ArrayBuffer[String] = ArrayBuffer()
-        // codec (applies only for output) and error codec
-        val codec: Codec = Codec(encoding).onMalformedInput(malformedRule)
-        val errCodec: Codec = Codec.UTF8.onMalformedInput(CodingErrorAction.REPLACE)
-
-        for (elem <- firstParent[T].iterator(split, context)) {
-            val logger: ProcessIO = new ProcessIO(
-                (input => input.close()),
-                (output => {
-                    // output can fail with malformed exception or any arbitrary exception
-                    // need to catch it and push to the error buffer
-                    // use `toString` to fetch type of exception
-                    try {
-                        Source.fromInputStream(output)(codec).getLines().foreach(line =>
-                            logbuf.append(line)
-                        )
-                    } catch {
-                        case NonFatal(e) => errbuf.append("[ERROR] " + e.toString())
-                    } finally {
-                        output.close()
-                    }
-                }),
-                (err => {
-                    // we apply UTF-8 encoding and REPLACE malformed rule for error, as it is a
-                    // general case, and we have to return error without generating another
-                    // exception.
-                    try {
-                        Source.fromInputStream(err)(errCodec).getLines().foreach(errline =>
-                            errbuf.append("[ERROR] " + errline)
-                        )
-                    } finally {
-                        err.close()
-                    }
-                }),
-                daemonizeThreads = true
-            )
-            // tokenize complex command, use resulting buffer as iterator
-            val cmds = EncodePipedRDD.tokenize(elem.toString)
-            // create buffered process from all the commands
-            var bufferedProcess: ProcessBuilder = null
-            cmds.foreach(cmd => {
-                require(cmd.nonEmpty, "Tokenizer returned empty command from " + elem.toString)
-                if (bufferedProcess == null) {
-                    bufferedProcess = Process(cmd)
-                } else {
-                    bufferedProcess = bufferedProcess.#|(Process(cmd))
-                }
-            })
-            // execute process, similar to Java's `process.waitFor()`
-            val exit = bufferedProcess.run(logger).exitValue()
-
-            // check for errors and strict rule, if something has happened, return first error
-            // if rule is strict then throw exception, otherwise log error message
-            if (errbuf.nonEmpty) {
-                val errorMsg = "Subprocess exited with status " + exit.toString + ". " +
-                    "Failed for elem: " + elem.toString + ", reason: " + errbuf.head
-                if (executionRule) {
-                    throw new IOException(errorMsg)
-                } else {
-                    logError(errorMsg)
-                }
-            }
-        }
-        // merge two buffers into one. Strategy: if error buffer is empty, return log buffer, else
-        // merge them, even if log buffer is empty.
-        val merged = if (errbuf.isEmpty) logbuf else logbuf ++ errbuf
-        merged.toIterator
+  override def compute(split: Partition, context: TaskContext): Iterator[String] = {
+    // set warning if `file.encoding` and `sun.jnu.encoding` properties do not match specified
+    // encoding, also display how to resolve problem.
+    val fileEncodingProp = Option(System.getProperty("file.encoding"))
+    val sunJnuEncodingProp = Option(System.getProperty("sun.jnu.encoding"))
+    if (!fileEncodingProp.isDefined || !sunJnuEncodingProp.isDefined ||
+        !fileEncodingProp.get.equals(encoding) || !sunJnuEncodingProp.get.equals(encoding)) {
+      logWarning("System encoding is different from " + encoding + ". Even encoding will " +
+        "be applied, driver program may display different result. It is recommended to " +
+        "set configuration options 'spark.driver.extraJavaOptions' and/or " +
+        "'spark.executor.extraJavaOptions' to be '-Dfile.encoding=YOUR_VALUE " +
+        "-Dsun.jnu.encoding=YOUR_VALUE'"
+      )
     }
+
+    // rule to apply on malformed exception
+    val malformedRule = if (strict) CodingErrorAction.REPORT else CodingErrorAction.REPLACE
+    val codec: Codec = Codec(encoding).onMalformedInput(malformedRule)
+    val errCodec: Codec = Codec.UTF8.onMalformedInput(CodingErrorAction.REPLACE)
+    var currentError = new AtomicReference[String](null)
+    var currentItem = new AtomicReference[String](null)
+
+    val pb = new ProcessBuilder(command.asJava)
+    // Add the environmental variables to the process.
+    val currentEnvVars = pb.environment()
+    envVars.foreach { case (variable, value) => currentEnvVars.put(variable, value) }
+
+    val proc = pb.start()
+    val childThreadException = new AtomicReference[Throwable](null)
+
+    // Start a thread to print the process's stderr to ours
+    new Thread(s"stderr reader for $command") {
+      override def run(): Unit = {
+        val err = proc.getErrorStream
+        try {
+          for (line <- Source.fromInputStream(err)(errCodec).getLines) {
+            currentError.set(line)
+            System.err.println(s"Error: $line")
+          }
+        } catch {
+          case t: Throwable => childThreadException.set(t)
+        } finally {
+          err.close()
+        }
+      }
+    }.start()
+
+    // Start a thread to feed the process input from our parent's iterator
+    new Thread(s"stdin writer for $command") {
+      override def run(): Unit = {
+        val out = new PrintWriter(new BufferedWriter(
+          new OutputStreamWriter(proc.getOutputStream), bufferSize))
+        try {
+          for (elem <- firstParent[T].iterator(split, context)) {
+            val item = elem.toString
+            require(item.nonEmpty, "Encountered empty element for input stream")
+            currentItem.set(item)
+            out.println(item)
+          }
+        } catch {
+          case t: Throwable => childThreadException.set(t)
+        } finally {
+          out.close()
+        }
+      }
+    }.start()
+
+    // Return an iterator that read lines from the process's stdout
+    val lines = Source.fromInputStream(proc.getInputStream)(codec).getLines()
+
+    new Iterator[String] {
+      def next(): String = {
+        if (!hasNext()) {
+          throw new NoSuchElementException()
+        }
+        lines.next()
+      }
+
+      def hasNext(): Boolean = {
+        val result = if (lines.hasNext) {
+          true
+        } else {
+          val exitStatus = proc.waitFor()
+          if (exitStatus != 0) {
+            // look up error stream
+            val err = currentError.get()
+            val item = currentItem.get()
+            val errMsg = s"Subprocess exited with status $exitStatus. " +
+              s"Command ran: ${command.mkString("[", " ", "]")} for item $item, reason: $err"
+            logError(errMsg)
+            if (strict) {
+              throw new IllegalStateException(errMsg)
+            } else {
+              // reset current error
+              currentError.set(null)
+              currentItem.set(null)
+            }
+          }
+          false
+        }
+        propagateChildException()
+        result
+      }
+
+      private def propagateChildException(): Unit = {
+        val t = childThreadException.get()
+        if (t != null) {
+          val commandRan = command.mkString(" ")
+          logError(s"Caught exception while running pipe() operator. Command ran: $commandRan. " +
+            s"Exception: ${t.getMessage}")
+          proc.destroy()
+          throw t
+        }
+      }
+    }
+  }
 }
 
-private[rdd] object EncodePipedRDD {
-    /**
-     * Splits command by pipe into several simple commands for processes
-     * e.g. cat temp/sample.log | grep -i "\" | a" will become
-     * Array(cat temp/sample.log, grep -i "\" | a")
-     * Each simple command is an array of tokens, cmd surrounding quotes are removed
-     */
-    def tokenize(cmd: String): ArrayBuffer[Array[String]] = {
-        var isDoubleQuoted = false
-        var isSingleQuoted = false
-        val cmdbuf = ArrayBuffer[Array[String]]()
-        val tmpbuf = new ArrayBuffer[String]()
-        val token = new StringBuilder()
-        var prevchr = '#'
-        // pattern for `::flushToken()` to remove redirects from command
-        // have to be careful not removing something else
-        val pattern = """^[^"']*>(/dev/null|&1)[^"']*$""".r
-
-        // whether current state is quoted, so we need to ignore pipe characters
-        def isQuoted(): Boolean = isDoubleQuoted || isSingleQuoted
-
-        // add newly created command from temp buffer
-        // remove all empty strings from sequence
-        // clear temp buffer to prepare for the next
-        def flushCmd() {
-            cmdbuf.append(tmpbuf.filter(_.nonEmpty).toArray)
-            tmpbuf.clear()
-        }
-
-        // add read token to the a current command buffer, and clear the token
-        // we also filter out redirects, e.g. 2>&1, or >/dev/null, because we are using error and
-        // output stream instead, and it is quite difficult to change them depending on redirect.
-        def flushToken() {
-            val tokenString = token.toString()
-            // if someone is trying to use redirect, drop it
-            if (pattern.findFirstMatchIn(tokenString).isEmpty) {
-                tmpbuf.append(tokenString)
-            }
-            token.clear()
-        }
-
-        for (chr <- cmd) {
-            if (!isQuoted() && chr == '|') {
-                flushToken()
-                flushCmd()
-            } else if (!isQuoted() && (chr == 9 || chr == 10 || chr == 11 || chr == 12 ||
-                chr == 13 || chr == 32 || chr == 160)) {
-                // if `chr` is a whitespace character we flush token
-                // instead of using scala.runtime.RichChar, we manually compare `chr` to list of
-                // Latin spaces: https://en.wikipedia.org/wiki/Whitespace_character
-                flushToken()
-            } else {
-                if (!isQuoted()) {
-                    if (chr == '"') {
-                        isDoubleQuoted = true
-                    } else if (chr == '\'') {
-                        isSingleQuoted = true
-                    } else {
-                        token.append(chr)
-                    }
-                } else {
-                    if (isSingleQuoted && chr == '\'' && prevchr != '\\') {
-                        isSingleQuoted = false
-                    } else if (isDoubleQuoted && chr == '"' && prevchr != '\\') {
-                        isDoubleQuoted = false
-                    } else {
-                        token.append(chr)
-                    }
-                }
-                prevchr = chr
-            }
-        }
-        // push the last command into cmd buffer
-        flushToken()
-        flushCmd()
-        // and return complete command buffer
-        cmdbuf
+object EncodePipedRDD {
+  // Split a string into words using a standard StringTokenizer
+  def tokenize(command: String): Seq[String] = {
+    val buf = new ArrayBuffer[String]
+    val tok = new StringTokenizer(command)
+    while(tok.hasMoreElements) {
+      buf += tok.nextToken()
     }
+    buf
+  }
 }

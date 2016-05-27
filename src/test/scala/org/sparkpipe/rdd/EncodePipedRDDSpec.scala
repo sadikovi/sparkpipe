@@ -32,7 +32,7 @@ class EncodePipedRDDSpec extends UnitTestSpec with SparkLocal with BeforeAndAfte
             )
         ).map("cat " + _)
         val c = a.pipeWithEncoding("UTF-8", strict=false)
-        c.collect.filter(_.startsWith("[ERROR]")).length should be (1)
+        c.collect.length should be (79) // .gitignore + sbt-build.sh
 
         intercept[Exception] {
             a.pipeWithEncoding("UTF-8", strict=true).count
@@ -46,6 +46,10 @@ class EncodePipedRDDSpec extends UnitTestSpec with SparkLocal with BeforeAndAfte
         val a = sc.parallelize(Array(testFile)).map("cat " + _)
         val b = a.pipeWithEncoding("ASCII", strict=false)
         b.collect.length should be (Source.fromFile(testFile).getLines().length)
+
+        // Test UTF-8
+        val c = a.pipeWithEncoding("UTF-8", strict=true)
+        c.collect.length should be (Source.fromFile(testFile).getLines().length)
 
         intercept[Exception] {
             a.pipeWithEncoding("ASCII", strict=true).count
@@ -105,12 +109,12 @@ class EncodePipedRDDSpec extends UnitTestSpec with SparkLocal with BeforeAndAfte
             map("cat " + _ + " 2>/dev/null | perl -ne 'print $_'").
             pipeWithEncoding()
         b.collect() should be (expected)
-        // testing cases where it should not drop them
+        // testing cases where syntax is invalid, so should return 0 records
         val c = sc.parallelize(Array(testFile)).
             map("cat " + _ + " 2 > &1 | perl -ne 'print $_'").
             pipeWithEncoding("UTF-8", strict = false)
-        val rows = c.filter(_.startsWith("[ERROR]"))collect()
-        rows.length should be (3)
+        val rows = c.collect()
+        rows.length should be (0)
         // testing escaped cases
         val d = sc.parallelize(Array(testFile)).
             map("cat " + _ + " 2>&1 | perl -ne 'print \"2>&1\".$_'").
